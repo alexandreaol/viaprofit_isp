@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Vincular Equipamento - ViaProfit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<h1>Vincular Equipamento ao Contrato</h1>
+
+<p><strong>Contrato selecionado:</strong> <span id="contratoSelecionado"></span></p>
+
+<form id="formVinculo">
+  <input type="hidden" name="numero_contrato" id="numeroContrato">
+
+  <label>Equipamento</label><br>
+  <select name="equipamento_id" id="equipamento_id" required></select><br><br>
+
+  <label>Data da instalação</label><br>
+  <input type="date" name="data_instalacao" required><br><br>
+
+  <label>Valor do equipamento no cálculo</label><br>
+  <input type="number" step="0.01" name="valor_usado_no_calculo" value="0"><br><br>
+
+  <label>Custo da instalação</label><br>
+  <input type="number" step="0.01" name="custo_instalacao" value="0"><br><br>
+
+  <label>Observação</label><br>
+  <textarea name="observacao"></textarea><br><br>
+
+  <button type="submit">Vincular Equipamento</button>
+</form>
+
+<br>
+<a href="contratos.html">Voltar para contratos</a>
+
+<script src="assets/js/vincular_equipamento.js"></script>
+</body>
+</html>
