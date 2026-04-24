@@ -35,6 +35,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
                         c.numero,
                         c.valor,
                         c.valor_plano,
+                        c.desconto,
                         c.status_contrato,
                         cli.nome
                     FROM contratos c
@@ -55,15 +56,10 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $idContrato = $contrato['id'];
 
-    $valorMensal = floatval(
-        $contrato['valor'] ??
-        $contrato['valor_plano'] ??
-        0
-    );
+    $valorBruto = floatval($contrato['valor'] ?? $contrato['valor_plano'] ?? 0);
+    $desconto = floatval($contrato['desconto'] ?? 0);
+    $valorMensal = max(0, $valorBruto - $desconto);
 
-    // Receita real recebida no banco via_ccm
-    // Campos reais da tabela recebimentos:
-    // valor_recebido e status = quitado
     $sqlReceita = "SELECT 
                         COALESCE(SUM(valor_recebido), 0) AS total_receita,
                         COUNT(*) AS meses_pagamento
@@ -81,7 +77,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     $totalReceita = floatval($receita['total_receita'] ?? 0);
     $meses = intval($receita['meses_pagamento'] ?? 0);
 
-    // Custos registrados no ViaProfit
     $sqlCustos = "SELECT 
                     COALESCE(SUM(valor), 0) AS total_custo
                   FROM custos_contrato
@@ -96,7 +91,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $totalCusto = floatval($custos['total_custo'] ?? 0);
 
-    // Equipamentos vinculados ao contrato
     $sqlEquipamentos = "SELECT 
                             ei.id AS vinculo_id,
                             ei.numero_contrato,
@@ -126,7 +120,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $equipamentos = $stmt->fetchAll();
 
-    // Manutenções vinculadas ao contrato
     $sqlManutencoes = "SELECT 
                             id,
                             data_manutencao,
@@ -165,6 +158,8 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
             'id' => $contrato['id'],
             'numero' => $contrato['numero'],
             'cliente' => $contrato['nome'],
+            'valor_bruto' => $valorBruto,
+            'desconto' => $desconto,
             'valor_mensal' => $valorMensal,
             'status_contrato' => $contrato['status_contrato']
         ],
