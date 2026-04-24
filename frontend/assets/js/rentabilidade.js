@@ -51,7 +51,9 @@ function montarTela(data) {
       <h2>${contrato.cliente || 'Cliente não informado'}</h2>
       <p><strong>Contrato:</strong> ${contrato.numero}</p>
       <p><strong>Status do contrato:</strong> ${contrato.status_contrato}</p>
-      <p><strong>Mensalidade:</strong> ${moeda(contrato.valor_mensal)}</p>
+      <p><strong>Valor sem desconto:</strong> ${moeda(contrato.valor_bruto)}</p>
+      <p><strong>Desconto:</strong> ${moeda(contrato.desconto)}</p>
+      <p><strong>Valor final mensal:</strong> ${moeda(contrato.valor_mensal)}</p>
     </div>
 
     <div class="card">
@@ -60,6 +62,21 @@ function montarTela(data) {
         <div class="metric">
           <span>Receita recebida</span>
           <strong>${moeda(resumo.receita_total)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Mensalidade sem desconto</span>
+          <strong>${moeda(contrato.valor_bruto)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Desconto mensal</span>
+          <strong>${moeda(contrato.desconto)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Mensalidade final</span>
+          <strong>${moeda(contrato.valor_mensal)}</strong>
         </div>
 
         <div class="metric">
