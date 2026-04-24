@@ -71,21 +71,28 @@ function buscarContratos($conn)
                 c.id,
                 c.numero,
                 c.valor,
+                c.valor_plano,
                 c.status_contrato,
+                c.dia_vencimento,
                 cli.nome,
                 cli.cpf
             FROM contratos c
             LEFT JOIN clientes cli ON cli.id = c.id_cliente
             WHERE 
-                c.numero LIKE :busca OR
-                cli.nome LIKE :busca OR
-                cli.cpf LIKE :busca
+                c.numero LIKE :busca_numero OR
+                cli.nome LIKE :busca_nome OR
+                cli.cpf LIKE :busca_cpf
             ORDER BY c.id DESC
             LIMIT 50";
 
     $stmt = $conn->prepare($sql);
+
+    $termo = '%' . $busca . '%';
+
     $stmt->execute([
-        ':busca' => "%$busca%"
+        ':busca_numero' => $termo,
+        ':busca_nome' => $termo,
+        ':busca_cpf' => $termo
     ]);
 
     jsonResponse(true, 'Resultado da busca', $stmt->fetchAll());
