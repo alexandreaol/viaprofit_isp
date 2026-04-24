@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Rentabilidade do Contrato - ViaProfit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f6f8; margin:0; padding:20px; color:#222; }
+    .container { max-width:1200px; margin:auto; }
+    .card { background:#fff; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 10px rgba(0,0,0,.08); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:15px; }
+    .metric { background:#f9fafb; padding:15px; border-radius:10px; border:1px solid #e5e7eb; }
+    .metric span { font-size:13px; color:#666; }
+    .metric strong { display:block; font-size:24px; margin-top:8px; }
+    .lucro { color:#15803d; }
+    .prejuizo { color:#b91c1c; }
+    .empate { color:#92400e; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; font-size:14px; }
+    th { background:#e5e7eb; }
+    input { padding:12px; border:1px solid #ccc; border-radius:8px; width:280px; max-width:100%; }
+    button { background:#2563eb; color:white; border:0; padding:12px 18px; border-radius:8px; cursor:pointer; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Rentabilidade do Contrato</h1>
+  <p>Veja se o contrato já deu lucro, prejuízo ou ainda está em payback.</p>
+
+  <div class="card">
+    <input id="numeroContrato" placeholder="Digite o número do contrato">
+    <button onclick="buscarRentabilidade()">Buscar</button>
+    <a href="contratos.html" style="margin-left:10px;">Buscar contratos</a>
+  </div>
+
+  <div id="resultado" class="hidden"></div>
+</div>
+
+<script src="assets/js/rentabilidade.js"></script>
+</body>
+</html>
