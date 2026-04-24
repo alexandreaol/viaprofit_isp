@@ -30,7 +30,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
         jsonResponse(false, 'Número do contrato obrigatório', [], 400);
     }
 
-    // Busca contrato no banco via_ccm
     $sqlContrato = "SELECT 
                         c.id,
                         c.numero,
@@ -55,16 +54,22 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     }
 
     $idContrato = $contrato['id'];
-    $valorMensal = floatval($contrato['valor'] ?? $contrato['valor_plano'] ?? 0);
 
-    // Receita recebida do contrato
-    // IMPORTANTE: usa id_contrato e campo valor, pois sua tabela não tem valor_pago
+    $valorMensal = floatval(
+        $contrato['valor'] ??
+        $contrato['valor_plano'] ??
+        0
+    );
+
+    // Receita real recebida no banco via_ccm
+    // Campos reais da tabela recebimentos:
+    // valor_recebido e status = quitado
     $sqlReceita = "SELECT 
-                        COALESCE(SUM(valor), 0) AS total_receita,
+                        COALESCE(SUM(valor_recebido), 0) AS total_receita,
                         COUNT(*) AS meses_pagamento
                     FROM recebimentos
                     WHERE id_contrato = :id_contrato
-                    AND status = 'pago'";
+                    AND status = 'quitado'";
 
     $stmt = $connSistema->prepare($sqlReceita);
     $stmt->execute([
@@ -76,7 +81,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     $totalReceita = floatval($receita['total_receita'] ?? 0);
     $meses = intval($receita['meses_pagamento'] ?? 0);
 
-    // Custos lançados no ViaProfit
+    // Custos registrados no ViaProfit
     $sqlCustos = "SELECT 
                     COALESCE(SUM(valor), 0) AS total_custo
                   FROM custos_contrato
@@ -91,7 +96,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $totalCusto = floatval($custos['total_custo'] ?? 0);
 
-    // Equipamentos vinculados
+    // Equipamentos vinculados ao contrato
     $sqlEquipamentos = "SELECT 
                             ei.id AS vinculo_id,
                             ei.numero_contrato,
@@ -99,6 +104,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
                             ei.valor_usado_no_calculo,
                             ei.custo_instalacao,
                             ei.status AS status_vinculo,
+                            ei.observacao AS observacao_vinculo,
                             e.id AS equipamento_id,
                             e.tipo,
                             e.marca,
@@ -120,7 +126,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $equipamentos = $stmt->fetchAll();
 
-    // Manutenções vinculadas
+    // Manutenções vinculadas ao contrato
     $sqlManutencoes = "SELECT 
                             id,
                             data_manutencao,
@@ -142,7 +148,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $manutencoes = $stmt->fetchAll();
 
-    // Cálculos principais
     $lucro = $totalReceita - $totalCusto;
     $lucroMensal = $meses > 0 ? ($lucro / $meses) : 0;
     $payback = $valorMensal > 0 ? ($totalCusto / $valorMensal) : 0;
