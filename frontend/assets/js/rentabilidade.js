@@ -81,17 +81,22 @@ function montarTela(data) {
         </div>
 
         <div class="metric">
-          <span>Lucro médio mensal</span>
+          <span>Lucro médio real</span>
           <strong class="${statusClass}">${moeda(resumo.lucro_mensal_medio)}</strong>
         </div>
 
         <div class="metric">
-          <span>Lucro mensal estimado</span>
+          <span>Payback real</span>
+          <strong>${numero(resumo.payback_real)} meses</strong>
+        </div>
+
+        <div class="metric">
+          <span>Lucro mensal projetado</span>
           <strong>${moeda(resumo.lucro_mensal_estimado)}</strong>
         </div>
 
         <div class="metric">
-          <span>Payback estimado</span>
+          <span>Payback projetado</span>
           <strong>${numero(resumo.payback_meses)} meses</strong>
         </div>
 

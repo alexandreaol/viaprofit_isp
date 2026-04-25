@@ -62,9 +62,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     // ==========================
     // RECEBIMENTOS QUITADOS
-    // Agora buscando também a forma real de pagamento:
-    // - baixas_recebimentos.forma_pagamento
-    // - cobrancas_gateway.forma_pagamento
     // ==========================
     $sqlRecebimentos = "SELECT 
                             r.id,
@@ -102,10 +99,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $recebimentosBrutos = $stmt->fetchAll();
 
-    /*
-     * Pode existir mais de uma cobrança_gateway ou baixa para o mesmo recebimento.
-     * Para não duplicar receita, agrupamos por r.id.
-     */
     $recebimentosAgrupados = [];
 
     foreach ($recebimentosBrutos as $linha) {
@@ -114,7 +107,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
         if (!isset($recebimentosAgrupados[$idRecebimento])) {
             $recebimentosAgrupados[$idRecebimento] = $linha;
         } else {
-            // Se já existe, preserva a primeira linha, mas tenta completar forma de pagamento se estiver vazia.
             if (empty($recebimentosAgrupados[$idRecebimento]['forma_pagamento_baixa']) && !empty($linha['forma_pagamento_baixa'])) {
                 $recebimentosAgrupados[$idRecebimento]['forma_pagamento_baixa'] = $linha['forma_pagamento_baixa'];
             }
@@ -144,7 +136,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
         $valorRecebido = floatval($recebimento['valor_recebido'] ?? 0);
         $totalReceita += $valorRecebido;
 
-        // Imposto: 6% sobre cada recebimento
+        // Imposto: 6% sobre cada recebimento.
         $totalImposto += ($valorRecebido * 0.06);
 
         $formaPagamento = obterFormaPagamento($recebimento);
@@ -168,7 +160,6 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     // ==========================
     // CUSTOS ÚNICOS DO CONTRATO
-    // equipamento, instalação, manutenção manual, material etc
     // ==========================
     $sqlCustosUnicos = "SELECT 
                             COALESCE(SUM(valor), 0) AS total_custo
@@ -184,8 +175,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     $totalCustosUnicos = floatval($custosUnicos['total_custo'] ?? 0);
 
     // ==========================
-    // CUSTOS MENSAIS CADASTRADOS NO CONTRATO
-    // Ex: sistema específico, suporte, repasse extra etc
+    // CUSTOS MENSAIS DO CONTRATO
     // ==========================
     $totalCustoMensalContrato = 0;
     $totalCustoMensalContratoAcumulado = 0;
@@ -209,15 +199,12 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     // ==========================
     // REDE NEUTRA
-    // R$ 23,50 por contrato/mês pago
     // ==========================
     $custoRedeNeutraMensal = 23.50;
     $totalRedeNeutra = $custoRedeNeutraMensal * $mesesPagos;
 
     // ==========================
-    // CUSTOS GERAIS MENSAIS RATEADOS
-    // Ex: link, sistema, técnico Mikrotik etc.
-    // Divide entre contratos ativos.
+    // CUSTOS GERAIS RATEADOS
     // ==========================
     $totalCustosGeraisRateados = 0;
 
@@ -302,19 +289,21 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $lucroMensalMedio = $mesesPagos > 0 ? ($lucroTotal / $mesesPagos) : 0;
 
-    // Lucro mensal estimado do contrato daqui para frente
-    // Considera mensalidade final, rede neutra, custos mensais cadastrados,
-    // imposto estimado e taxa Pix padrão de R$ 0,40.
+    // Projeção mensal futura.
     $impostoMensalEstimado = $valorMensal * 0.06;
     $taxaPagamentoMensalEstimada = 0.40;
+
     $lucroMensalEstimado = $valorMensal
         - $custoRedeNeutraMensal
         - $totalCustoMensalContrato
         - $impostoMensalEstimado
         - $taxaPagamentoMensalEstimada;
 
-    // Payback usando custos únicos dividido pelo lucro mensal estimado
+    // Payback projetado: usa lucro mensal estimado.
     $payback = $lucroMensalEstimado > 0 ? ($totalCustosUnicos / $lucroMensalEstimado) : 0;
+
+    // Payback real: usa lucro médio real já apurado.
+    $paybackReal = $lucroMensalMedio > 0 ? ($totalCustosUnicos / $lucroMensalMedio) : 0;
 
     $statusRentabilidade = 'empate';
 
@@ -360,7 +349,10 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
             'meses_pagos' => $mesesPagos,
             'lucro_mensal_medio' => $lucroMensalMedio,
             'lucro_mensal_estimado' => $lucroMensalEstimado,
+
             'payback_meses' => $payback,
+            'payback_real' => $paybackReal,
+
             'status_rentabilidade' => $statusRentabilidade
         ],
         'recebimentos' => $recebimentos,
@@ -481,17 +473,14 @@ function calcularCustosGeraisRateados($connSistema, $connViaprofit, $competencia
 
 function converterCompetenciaParaReferencia($competencia)
 {
-    // Se já vier no formato 2026-04, mantém
     if (preg_match('/^\d{4}-\d{2}$/', $competencia)) {
         return $competencia;
     }
 
-    // Se vier 04/2026, converte para 2026-04
     if (preg_match('/^(\d{2})\/(\d{4})$/', $competencia, $m)) {
         return $m[2] . '-' . $m[1];
     }
 
-    // Se vier 202604, converte para 2026-04
     if (preg_match('/^\d{6}$/', $competencia)) {
         return substr($competencia, 0, 4) . '-' . substr($competencia, 4, 2);
     }
@@ -545,7 +534,6 @@ function gerarSimulacao12Meses()
             $imposto -
             $taxaPagamento;
 
-        // Instalação custa R$80, mas é cobrada R$80 do cliente, então o impacto líquido é zero.
         $custoInstalacaoLiquido = $custoInstalacao - $valorCobradoInstalacao;
 
         $investimentoInicial = $equipamento + $custoInstalacaoLiquido;
