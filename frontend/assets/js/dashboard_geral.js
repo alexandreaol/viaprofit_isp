@@ -58,6 +58,7 @@ function montarLinhaSaude(d) {
     ${card('Contratos ativos', d.contratos_ativos)}
     ${card('Lucrativos', d.contratos_lucrativos, true)}
     ${card('Com prejuízo', d.contratos_em_prejuizo, false)}
+    ${card('Em payback', d.contratos_em_payback)}
     ${card('Prejuízo > 4 meses', d.contratos_prejuizo_mais_4_meses, false)}
     ${card('Prejuízo > 6 meses', d.contratos_prejuizo_mais_6_meses, false)}
     ${card('Ticket médio', moeda(d.ticket_medio))}

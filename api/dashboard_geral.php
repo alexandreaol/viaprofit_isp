@@ -277,12 +277,14 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             ? $saudeRealContrato['lucro_total_real']
             : $lucroMensalProjetado;
         $paybackAcimaLimite = $saudeContrato['payback_meses'] > 6;
+        $estaEmPayback = $saudeContrato['tem_payback']
+            && (!$saudeRealContrato['tem_resultado_real'] || $saudeRealContrato['lucro_total_real'] < 0);
 
-        $estaEmPrejuizo = $lucroClassificacao < 0 || $paybackAcimaLimite;
+        $estaEmPrejuizo = !$estaEmPayback && ($lucroClassificacao < 0 || $paybackAcimaLimite);
 
-        if (!$estaEmPrejuizo && $lucroClassificacao > 0) {
+        if (!$estaEmPayback && !$estaEmPrejuizo && $lucroClassificacao > 0) {
             $contratosLucrativos++;
-        } else {
+        } elseif ($estaEmPrejuizo) {
             $contratosPrejuizo++;
         }
 
@@ -294,7 +296,7 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             $contratosPrejuizoMais6Meses++;
         }
 
-        if ($saudeContrato['tem_payback']) {
+        if ($estaEmPayback) {
             $contratosPayback++;
         }
 
@@ -311,6 +313,7 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             'custo_total_mensal_projetado' => $saudeContrato['custo_total_mensal_projetado'],
             'payback_meses' => $saudeContrato['payback_meses'],
             'payback_acima_limite' => $paybackAcimaLimite,
+            'esta_em_payback' => $estaEmPayback,
             'lucro_mensal_projetado' => $lucroMensalProjetado,
             'tem_resultado_real' => $saudeRealContrato['tem_resultado_real'],
             'receita_real' => $saudeRealContrato['receita_real'],
