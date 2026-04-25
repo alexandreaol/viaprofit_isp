@@ -24,6 +24,11 @@ try {
 
 function gerarResumoGeral($connSistema, $connViaprofit)
 {
+    $custoRedeNeutraMensal = 23.50;
+    $percentualImposto = 0.06;
+    $taxaBoleto = 2.99;
+    $taxaPix = 0.50;
+
     $referencia = $_GET['referencia'] ?? date('Y-m');
     $inicioMes = $referencia . '-01';
     $fimMes = date('Y-m-t', strtotime($inicioMes));
@@ -62,12 +67,10 @@ function gerarResumoGeral($connSistema, $connViaprofit)
         : 0;
 
     // ==========================
-    // RECEBIMENTOS DO MÊS
+    // LINHA 1 - VISÃO FINANCEIRA
     // ==========================
     $stmt = $connSistema->prepare("
         SELECT
-            COALESCE(SUM(valor_final), 0) AS receita_prevista_mes,
-            COALESCE(SUM(CASE WHEN status IN ('quitado','parcial') THEN valor_recebido ELSE 0 END), 0) AS receita_recebida_mes,
             COALESCE(SUM(CASE WHEN status IN ('aberto','gerado','parcial') THEN saldo_restante ELSE 0 END), 0) AS em_aberto_mes,
             COALESCE(SUM(CASE WHEN status = 'vencido' THEN saldo_restante ELSE 0 END), 0) AS vencido_mes
         FROM recebimentos
@@ -80,14 +83,10 @@ function gerarResumoGeral($connSistema, $connViaprofit)
     ]);
     $recebimentosMes = $stmt->fetch();
 
-    $receitaPrevistaMes = floatval($recebimentosMes['receita_prevista_mes'] ?? 0);
-    $receitaRecebidaMes = floatval($recebimentosMes['receita_recebida_mes'] ?? 0);
+    $receitaPrevistaMes = $receitaPrevistaContratos;
     $emAbertoMes = floatval($recebimentosMes['em_aberto_mes'] ?? 0);
     $vencidoMes = floatval($recebimentosMes['vencido_mes'] ?? 0);
 
-    // ==========================
-    // IMPOSTOS E TAXAS DO MÊS
-    // ==========================
     $stmt = $connSistema->prepare("
         SELECT 
             r.id,
@@ -95,7 +94,11 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             r.valor_final,
             r.valor_recebido,
             br.forma_pagamento AS forma_pagamento_baixa,
-            cg.forma_pagamento AS forma_pagamento_gateway
+            br.valor_pago AS valor_pago_baixa,
+            cg.gateway,
+            cg.forma_pagamento AS forma_pagamento_gateway,
+            cg.status_local,
+            cg.status_gateway
         FROM recebimentos r
         LEFT JOIN baixas_recebimentos br ON br.id_recebimento = r.id
         LEFT JOIN cobrancas_gateway cg ON cg.id_recebimento = r.id
@@ -123,9 +126,26 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             if (empty($recebimentosAgrupados[$id]['forma_pagamento_gateway']) && !empty($linha['forma_pagamento_gateway'])) {
                 $recebimentosAgrupados[$id]['forma_pagamento_gateway'] = $linha['forma_pagamento_gateway'];
             }
+
+            if (empty($recebimentosAgrupados[$id]['valor_pago_baixa']) && !empty($linha['valor_pago_baixa'])) {
+                $recebimentosAgrupados[$id]['valor_pago_baixa'] = $linha['valor_pago_baixa'];
+            }
+
+            if (empty($recebimentosAgrupados[$id]['gateway']) && !empty($linha['gateway'])) {
+                $recebimentosAgrupados[$id]['gateway'] = $linha['gateway'];
+            }
+
+            if (empty($recebimentosAgrupados[$id]['status_local']) && !empty($linha['status_local'])) {
+                $recebimentosAgrupados[$id]['status_local'] = $linha['status_local'];
+            }
+
+            if (empty($recebimentosAgrupados[$id]['status_gateway']) && !empty($linha['status_gateway'])) {
+                $recebimentosAgrupados[$id]['status_gateway'] = $linha['status_gateway'];
+            }
         }
     }
 
+    $receitaRecebidaMes = 0;
     $impostosEstimados = 0;
     $taxasPix = 0;
     $taxasBoleto = 0;
@@ -133,24 +153,34 @@ function gerarResumoGeral($connSistema, $connViaprofit)
     foreach ($recebimentosAgrupados as $recebimento) {
         $statusRecebimento = $recebimento['status'] ?? '';
         $valorRecebido = floatval($recebimento['valor_recebido'] ?? 0);
+        $valorBaixa = floatval($recebimento['valor_pago_baixa'] ?? 0);
         $valorPrevisto = floatval($recebimento['valor_final'] ?? 0);
-        $valorBaseImposto = $statusRecebimento === 'quitado' ? $valorRecebido : $valorPrevisto;
+        $recebidoViaBaixaManual = $valorBaixa > 0;
+        $recebidoViaGateway = gatewayConfirmadoDashboard($recebimento);
+        $valorBaixado = max($valorBaixa, $valorRecebido);
+        $foiRecebido = $recebidoViaBaixaManual || $recebidoViaGateway || $statusRecebimento === 'quitado' || $statusRecebimento === 'parcial' || $valorBaixado > 0;
+        $valorReceita = $valorBaixado > 0 ? $valorBaixado : $valorPrevisto;
+        $valorBaseImposto = $foiRecebido ? $valorReceita : $valorPrevisto;
 
-        $impostosEstimados += $valorBaseImposto * 0.06;
+        if ($foiRecebido) {
+            $receitaRecebidaMes += $valorReceita;
+        }
+
+        $impostosEstimados += $valorBaseImposto * $percentualImposto;
 
         $formaPagamento = obterFormaPagamentoDashboard($recebimento);
 
         if ($formaPagamento === 'boleto') {
-            $taxasBoleto += 2.99;
+            $taxasBoleto += $taxaBoleto;
         } elseif ($formaPagamento === 'pix') {
-            $taxasPix += 0.40;
+            $taxasPix += $taxaPix;
         }
     }
 
     // ==========================
     // CUSTOS
     // ==========================
-    $redeNeutraTotal = $totalContratosAtivos * 23.50;
+    $redeNeutraTotal = $totalContratosAtivos * $custoRedeNeutraMensal;
 
     $custosUnicosMes = 0;
     if (tabelaExisteDashboard($connViaprofit, 'custos_contrato')) {
@@ -220,9 +250,9 @@ function gerarResumoGeral($connSistema, $connViaprofit)
         $custosUnicosContrato = buscarCustosUnicosContrato($connViaprofit, $numero);
         $custoMensalContrato = buscarCustoMensalContrato($connViaprofit, $numero);
 
-        $impostoMensal = $valorMensal * 0.06;
-        $taxaPagamentoPadrao = 0.40;
-        $redeNeutraMensal = 23.50;
+        $impostoMensal = $valorMensal * $percentualImposto;
+        $taxaPagamentoPadrao = $taxaPix;
+        $redeNeutraMensal = $custoRedeNeutraMensal;
 
         $lucroMensalProjetado =
             $valorMensal -
@@ -424,6 +454,41 @@ function obterFormaPagamentoDashboard($recebimento)
     }
 
     return 'pix';
+}
+
+function gatewayConfirmadoDashboard($recebimento)
+{
+    $statusLocal = normalizarStatusDashboard($recebimento['status_local'] ?? '');
+    $statusGateway = normalizarStatusDashboard($recebimento['status_gateway'] ?? '');
+
+    $statusConfirmados = [
+        'pago',
+        'paid',
+        'quitado',
+        'confirmed',
+        'confirmado',
+        'completed',
+        'complete',
+        'concluido',
+        'concluida',
+        'liquidado',
+        'received',
+        'recebido'
+    ];
+
+    return in_array($statusLocal, $statusConfirmados, true)
+        || in_array($statusGateway, $statusConfirmados, true);
+}
+
+function normalizarStatusDashboard($status)
+{
+    $status = strtolower(trim($status));
+
+    return str_replace(
+        ['á', 'à', 'ã', 'â', 'é', 'ê', 'í', 'ó', 'ô', 'õ', 'ú', 'ç'],
+        ['a', 'a', 'a', 'a', 'e', 'e', 'i', 'o', 'o', 'o', 'u', 'c'],
+        $status
+    );
 }
 
 function normalizarFormaPagamentoDashboard($forma)
