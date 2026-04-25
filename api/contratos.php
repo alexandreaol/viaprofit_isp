@@ -7,7 +7,6 @@ try {
     $conn = conectarSistema();
 
     switch ($action) {
-
         case 'listar':
             listarContratos($conn);
             break;
@@ -30,35 +29,33 @@ try {
     ], 500);
 }
 
-
-// ============================
-// LISTAR TODOS
-// ============================
 function listarContratos($conn)
 {
     $sql = "SELECT 
                 c.id,
                 c.numero,
                 c.valor,
+                c.valor_plano,
+                c.desconto,
                 c.status_contrato,
                 c.dia_vencimento,
                 cli.nome,
-                cli.cpf
+                cli.cpf,
+                GREATEST(
+                    COALESCE(c.valor, c.valor_plano, 0) - COALESCE(c.desconto, 0),
+                    0
+                ) AS valor_final
             FROM contratos c
             LEFT JOIN clientes cli ON cli.id = c.id_cliente
             ORDER BY c.id DESC
-            LIMIT 100";
+            LIMIT 300";
 
     $stmt = $conn->prepare($sql);
     $stmt->execute();
 
-    jsonResponse(true, 'Contratos listados', $stmt->fetchAll());
+    jsonResponse(true, 'Contratos listados com sucesso.', $stmt->fetchAll());
 }
 
-
-// ============================
-// BUSCAR POR NOME / CPF / NUMERO
-// ============================
 function buscarContratos($conn)
 {
     $busca = $_GET['busca'] ?? '';
@@ -72,10 +69,15 @@ function buscarContratos($conn)
                 c.numero,
                 c.valor,
                 c.valor_plano,
+                c.desconto,
                 c.status_contrato,
                 c.dia_vencimento,
                 cli.nome,
-                cli.cpf
+                cli.cpf,
+                GREATEST(
+                    COALESCE(c.valor, c.valor_plano, 0) - COALESCE(c.desconto, 0),
+                    0
+                ) AS valor_final
             FROM contratos c
             LEFT JOIN clientes cli ON cli.id = c.id_cliente
             WHERE 
@@ -83,7 +85,7 @@ function buscarContratos($conn)
                 cli.nome LIKE :busca_nome OR
                 cli.cpf LIKE :busca_cpf
             ORDER BY c.id DESC
-            LIMIT 50";
+            LIMIT 100";
 
     $stmt = $conn->prepare($sql);
 
@@ -98,10 +100,6 @@ function buscarContratos($conn)
     jsonResponse(true, 'Resultado da busca', $stmt->fetchAll());
 }
 
-
-// ============================
-// DETALHE DO CONTRATO
-// ============================
 function detalheContrato($conn)
 {
     $numero = $_GET['numero'] ?? '';
@@ -112,6 +110,10 @@ function detalheContrato($conn)
 
     $sql = "SELECT 
                 c.*,
+                GREATEST(
+                    COALESCE(c.valor, c.valor_plano, 0) - COALESCE(c.desconto, 0),
+                    0
+                ) AS valor_final,
                 cli.nome,
                 cli.cpf,
                 cli.rua,
