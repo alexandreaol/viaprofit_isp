@@ -140,6 +140,7 @@
     </div>
   </div>
 
+  <!-- LINHA 1 -->
   <div class="card">
     <h2>Linha 1 — Visão financeira</h2>
     <div class="grid" id="linhaFinanceira">
@@ -147,6 +148,7 @@
     </div>
   </div>
 
+  <!-- LINHA 2 -->
   <div class="card">
     <h2>Linha 2 — Saúde dos contratos</h2>
     <div class="grid" id="linhaSaudeContratos">
@@ -154,6 +156,7 @@
     </div>
   </div>
 
+  <!-- LINHA 3 -->
   <div class="card">
     <h2>Linha 3 — Custos</h2>
     <div class="grid" id="linhaCustos">
@@ -161,10 +164,12 @@
     </div>
   </div>
 
+  <!-- LINHA 4 -->
   <div class="card">
     <h2>Linha 4 — Ranking</h2>
 
     <div class="ranking-grid">
+
       <div>
         <h3>Top 10 melhores contratos</h3>
         <table>
@@ -202,7 +207,7 @@
       </div>
 
       <div>
-        <h3>Contratos sem equipamento vinculado</h3>
+        <h3>Sem equipamento</h3>
         <table>
           <thead>
             <tr>
@@ -219,7 +224,7 @@
       </div>
 
       <div>
-        <h3>Contratos sem custo mensal cadastrado</h3>
+        <h3>Sem custo mensal</h3>
         <table>
           <thead>
             <tr>
@@ -234,12 +239,19 @@
           </tbody>
         </table>
       </div>
+
     </div>
   </div>
 
 </div>
 
-<script src="assets/js/dashboard_geral.js?v=2"></script>
+<!-- JS MODULAR -->
+<script src="assets/js/dashboard/utils.js?v=1"></script>
+<script src="assets/js/dashboard/linha_financeira.js?v=1"></script>
+<script src="assets/js/dashboard/linha_saude.js?v=1"></script>
+<script src="assets/js/dashboard/linha_custos.js?v=1"></script>
+<script src="assets/js/dashboard/linha_ranking.js?v=1"></script>
+<script src="assets/js/dashboard/dashboard.js?v=1"></script>
 
 </body>
 </html>
