@@ -67,7 +67,7 @@ function gerarResumoGeral($connSistema, $connViaprofit)
     $stmt = $connSistema->prepare("
         SELECT
             COALESCE(SUM(valor_final), 0) AS receita_prevista_mes,
-            COALESCE(SUM(CASE WHEN status = 'quitado' THEN valor_recebido ELSE 0 END), 0) AS receita_recebida_mes,
+            COALESCE(SUM(CASE WHEN status IN ('quitado','parcial') THEN valor_recebido ELSE 0 END), 0) AS receita_recebida_mes,
             COALESCE(SUM(CASE WHEN status IN ('aberto','gerado','parcial') THEN saldo_restante ELSE 0 END), 0) AS em_aberto_mes,
             COALESCE(SUM(CASE WHEN status = 'vencido' THEN saldo_restante ELSE 0 END), 0) AS vencido_mes
         FROM recebimentos
@@ -91,14 +91,16 @@ function gerarResumoGeral($connSistema, $connViaprofit)
     $stmt = $connSistema->prepare("
         SELECT 
             r.id,
+            r.status,
+            r.valor_final,
             r.valor_recebido,
             br.forma_pagamento AS forma_pagamento_baixa,
             cg.forma_pagamento AS forma_pagamento_gateway
         FROM recebimentos r
         LEFT JOIN baixas_recebimentos br ON br.id_recebimento = r.id
         LEFT JOIN cobrancas_gateway cg ON cg.id_recebimento = r.id
-        WHERE r.status = 'quitado'
-        AND r.data_vencimento BETWEEN :inicio AND :fim
+        WHERE r.data_vencimento BETWEEN :inicio AND :fim
+        AND r.status NOT IN ('cancelado','excluido')
     ");
     $stmt->execute([
         ':inicio' => $inicioMes,
@@ -129,9 +131,12 @@ function gerarResumoGeral($connSistema, $connViaprofit)
     $taxasBoleto = 0;
 
     foreach ($recebimentosAgrupados as $recebimento) {
+        $statusRecebimento = $recebimento['status'] ?? '';
         $valorRecebido = floatval($recebimento['valor_recebido'] ?? 0);
+        $valorPrevisto = floatval($recebimento['valor_final'] ?? 0);
+        $valorBaseImposto = $statusRecebimento === 'quitado' ? $valorRecebido : $valorPrevisto;
 
-        $impostosEstimados += $valorRecebido * 0.06;
+        $impostosEstimados += $valorBaseImposto * 0.06;
 
         $formaPagamento = obterFormaPagamentoDashboard($recebimento);
 
@@ -196,7 +201,8 @@ function gerarResumoGeral($connSistema, $connViaprofit)
         $custosGeraisRateados +
         $custosMensaisContratoTotal;
 
-    $lucroEstimado = $receitaRecebidaMes - $custoTotalEstimado;
+    $lucroEstimado = $receitaPrevistaMes - $custoTotalEstimado;
+    $lucroRealizadoParcial = $receitaRecebidaMes - $custoTotalEstimado;
 
     // ==========================
     // SAÚDE DOS CONTRATOS / RANKINGS
@@ -334,7 +340,8 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             'receita_prevista' => $receitaPrevistaMes,
             'em_aberto' => $emAbertoMes,
             'vencido' => $vencidoMes,
-            'lucro_estimado' => $lucroEstimado
+            'lucro_estimado' => $lucroEstimado,
+            'lucro_realizado_parcial' => $lucroRealizadoParcial
         ],
 
         'linha_2_saude_contratos' => [

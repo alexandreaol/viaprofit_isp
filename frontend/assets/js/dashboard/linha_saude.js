@@ -24,7 +24,7 @@ function montarLinhaSaude(dados) {
     ${card('Contratos ativos', dados.contratos_ativos)}
     ${card('Contratos lucrativos', dados.contratos_lucrativos, true)}
     ${card('Contratos em prejuízo', dados.contratos_em_prejuizo, false)}
-    ${card('Contratos em payback', dados.contratos_em_payback)}
+    ${card('Contratos com payback', dados.contratos_em_payback)}
     ${card('Ticket médio', moeda(dados.ticket_medio))}
   `;
 }

@@ -58,7 +58,7 @@ function montarLinhaSaude(d) {
     ${card('Contratos ativos', d.contratos_ativos)}
     ${card('Lucrativos', d.contratos_lucrativos, true)}
     ${card('Prejuízo', d.contratos_em_prejuizo, false)}
-    ${card('Em payback', d.contratos_em_payback)}
+    ${card('Com payback', d.contratos_em_payback)}
     ${card('Ticket médio', moeda(d.ticket_medio))}
   `;
 }
@@ -72,6 +72,7 @@ function montarLinhaCustos(d) {
     ${card('Impostos', moeda(d.impostos_estimados))}
     ${card('Taxas Pix/Boleto', moeda(d.taxas_pix_boleto))}
     ${card('Custos únicos', moeda(d.custos_unicos_mes))}
+    ${card('Custos mensais', moeda(d.custos_mensais_contratos))}
     ${card('Custos gerais', moeda(d.custos_gerais_rateados))}
   `;
 }

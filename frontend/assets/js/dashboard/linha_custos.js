@@ -25,6 +25,7 @@ function montarLinhaCustos(dados) {
     ${card('Impostos estimados', moeda(dados.impostos_estimados))}
     ${card('Taxas Pix/Boleto', moeda(dados.taxas_pix_boleto))}
     ${card('Custos únicos do mês', moeda(dados.custos_unicos_mes))}
-    ${card('Custos gerais rateados', moeda(dados.custos_gerais_rateados))}
+    ${card('Custos mensais contratos', moeda(dados.custos_mensais_contratos))}
+    ${card('Custos gerais do mês', moeda(dados.custos_gerais_rateados))}
   `;
 }
