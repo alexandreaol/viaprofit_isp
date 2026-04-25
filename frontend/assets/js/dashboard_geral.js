@@ -1,21 +1,33 @@
 const API = '../api/dashboard_geral.php';
 
-document.addEventListener('DOMContentLoaded', carregar);
+document.addEventListener('DOMContentLoaded', () => {
+  const inputRef = document.getElementById('referencia');
 
-async function carregar() {
+  // Define mês atual
+  const hoje = new Date();
+  inputRef.value = hoje.toISOString().slice(0, 7);
+
+  carregarDashboard();
+});
+
+async function carregarDashboard() {
+  const ref = document.getElementById('referencia').value;
+
   try {
-    const res = await fetch(`${API}?action=resumo`);
+    const res = await fetch(`${API}?action=resumo&referencia=${ref}`);
     const json = await res.json();
 
     if (!json.success) {
-      alert('Erro ao carregar dashboard');
+      alert('Erro ao carregar dados');
       return;
     }
 
-    montarFinanceiro(json.data.financeiro);
-    montarCustos(json.data.custos);
-    montarOperacional(json.data.operacional);
-    montarContratos(json.data.contratos_recentes);
+    const data = json.data;
+
+    montarLinhaFinanceira(data.linha_1_visao_financeira);
+    montarLinhaSaude(data.linha_2_saude_contratos);
+    montarLinhaCustos(data.linha_3_custos);
+    montarRanking(data.linha_4_ranking);
 
   } catch (e) {
     console.error(e);
@@ -23,50 +35,110 @@ async function carregar() {
   }
 }
 
-function montarFinanceiro(d) {
-  document.getElementById('financeiro').innerHTML = `
-    ${card('Receita prevista', moeda(d.receita_mensal_prevista))}
-    ${card('Recebido', moeda(d.recebido_mes))}
-    ${card('Em aberto', moeda(d.aberto_mes))}
-    ${card('Vencido', moeda(d.vencido_mes))}
-    ${card('Lucro estimado', moeda(d.lucro_estimado_mes), d.lucro_estimado_mes >= 0)}
+// =======================
+// LINHA 1 — FINANCEIRO
+// =======================
+function montarLinhaFinanceira(d) {
+  document.getElementById('linhaFinanceira').innerHTML = `
+    ${card('Receita recebida', moeda(d.receita_recebida))}
+    ${card('Receita prevista', moeda(d.receita_prevista))}
+    ${card('Em aberto', moeda(d.em_aberto))}
+    ${card('Vencido', moeda(d.vencido), false)}
+    ${card('Lucro estimado', moeda(d.lucro_estimado), d.lucro_estimado >= 0)}
+  `;
+}
+
+// =======================
+// LINHA 2 — SAÚDE
+// =======================
+function montarLinhaSaude(d) {
+  document.getElementById('linhaSaudeContratos').innerHTML = `
+    ${card('Contratos ativos', d.contratos_ativos)}
+    ${card('Lucrativos', d.contratos_lucrativos, true)}
+    ${card('Prejuízo', d.contratos_em_prejuizo, false)}
+    ${card('Em payback', d.contratos_em_payback)}
     ${card('Ticket médio', moeda(d.ticket_medio))}
   `;
 }
 
-function montarCustos(d) {
-  document.getElementById('custos').innerHTML = `
-    ${card('Rede neutra', moeda(d.rede_neutra_mes))}
-    ${card('Impostos', moeda(d.impostos_mes))}
-    ${card('Pix', moeda(d.taxas_pix_mes))}
-    ${card('Boleto', moeda(d.taxas_boleto_mes))}
-    ${card('Custos contratos', moeda(d.custos_mensais_contratos))}
-    ${card('Custos gerais', moeda(d.custos_gerais_mes))}
+// =======================
+// LINHA 3 — CUSTOS
+// =======================
+function montarLinhaCustos(d) {
+  document.getElementById('linhaCustos').innerHTML = `
+    ${card('Rede neutra', moeda(d.rede_neutra_total))}
+    ${card('Impostos', moeda(d.impostos_estimados))}
+    ${card('Taxas Pix/Boleto', moeda(d.taxas_pix_boleto))}
+    ${card('Custos únicos', moeda(d.custos_unicos_mes))}
+    ${card('Custos gerais', moeda(d.custos_gerais_rateados))}
   `;
 }
 
-function montarOperacional(d) {
-  document.getElementById('operacional').innerHTML = `
-    ${card('Contratos ativos', d.contratos_ativos)}
-    ${card('Recebimentos', d.total_recebimentos)}
-    ${card('Quitados', d.recebimentos_quitados)}
-    ${card('Equipamentos', d.equipamentos_instalados)}
-    ${card('Sem equipamento', d.contratos_sem_equipamento)}
-  `;
+// =======================
+// LINHA 4 — RANKING
+// =======================
+function montarRanking(d) {
+
+  document.getElementById('topMelhores').innerHTML =
+    montarTabelaRanking(d.top_10_melhores_contratos);
+
+  document.getElementById('topPiores').innerHTML =
+    montarTabelaRanking(d.top_10_piores_contratos);
+
+  document.getElementById('semEquipamento').innerHTML =
+    montarTabelaSimples(d.contratos_sem_equipamento);
+
+  document.getElementById('semCustoMensal').innerHTML =
+    montarTabelaSimples(d.contratos_sem_custo_mensal);
 }
 
-function montarContratos(lista) {
-  document.getElementById('contratos').innerHTML = lista.map(c => `
+function montarTabelaRanking(lista) {
+  if (!lista.length) {
+    return `<tr><td colspan="5">Nenhum dado</td></tr>`;
+  }
+
+  return lista.map(c => `
     <tr>
       <td>${c.numero}</td>
-      <td>${c.nome}</td>
+      <td>${c.cliente}</td>
       <td>${moeda(c.valor_final)}</td>
+      <td class="${c.lucro_mensal_projetado >= 0 ? 'verde' : 'vermelho'}">
+        ${moeda(c.lucro_mensal_projetado)}
+      </td>
+      <td>
+        <a class="btn" href="rentabilidade.html?contrato=${encodeURIComponent(c.numero)}">
+          Ver
+        </a>
+      </td>
     </tr>
   `).join('');
 }
 
+function montarTabelaSimples(lista) {
+  if (!lista.length) {
+    return `<tr><td colspan="4">Nenhum dado</td></tr>`;
+  }
+
+  return lista.map(c => `
+    <tr>
+      <td>${c.numero}</td>
+      <td>${c.cliente}</td>
+      <td>${moeda(c.valor_final)}</td>
+      <td>
+        <a class="btn" href="rentabilidade.html?contrato=${encodeURIComponent(c.numero)}">
+          Ver
+        </a>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// =======================
+// UTIL
+// =======================
 function card(titulo, valor, positivo = null) {
   let cor = '';
+
   if (positivo !== null) {
     cor = positivo ? 'verde' : 'vermelho';
   }
