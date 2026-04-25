@@ -9,7 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (inputReferencia) {
     const hoje = new Date();
-    inputReferencia.value = hoje.toISOString().slice(0, 7);
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    inputReferencia.value = `${ano}-${mes}`;
   }
 
   carregarDashboard();

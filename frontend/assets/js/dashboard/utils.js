@@ -16,6 +16,16 @@ function numero(valor) {
   });
 }
 
+function textoSeguro(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (caractere) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[caractere]);
+}
+
 // =======================
 // CARD PADRÃO
 // =======================
@@ -31,8 +41,8 @@ function card(titulo, valor, positivo = null) {
 
   return `
     <div class="metric">
-      <span>${titulo}</span>
-      <strong class="${classe}">${valor}</strong>
+      <span>${textoSeguro(titulo)}</span>
+      <strong class="${classe}">${textoSeguro(valor)}</strong>
     </div>
   `;
 }

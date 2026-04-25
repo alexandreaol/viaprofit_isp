@@ -45,7 +45,7 @@ async function carregarContratos(url) {
     const resultado = await response.json();
 
     if (!resultado.success) {
-      tbody.innerHTML = `<tr><td colspan="9">${resultado.message || 'Erro ao carregar contratos.'}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9">${textoSeguro(resultado.message || 'Erro ao carregar contratos.')}</td></tr>`;
       return;
     }
 
@@ -75,14 +75,14 @@ function montarLinhaContrato(c) {
 
   return `
     <tr>
-      <td>${numeroContrato}</td>
-      <td>${c.nome || ''}</td>
-      <td>${c.cpf || ''}</td>
+      <td>${textoSeguro(numeroContrato)}</td>
+      <td>${textoSeguro(c.nome || '')}</td>
+      <td>${textoSeguro(c.cpf || '')}</td>
       <td>${moeda(valorBase)}</td>
       <td>${moeda(desconto)}</td>
       <td><strong>${moeda(valorFinal)}</strong></td>
-      <td>${c.dia_vencimento || ''}</td>
-      <td><span class="status ${status}">${c.status_contrato || ''}</span></td>
+      <td>${textoSeguro(c.dia_vencimento || '')}</td>
+      <td><span class="status ${classeStatus(status)}">${textoSeguro(c.status_contrato || '')}</span></td>
       <td>
         <div class="acoes">
           <a class="btn btn-green" href="rentabilidade.html?contrato=${encodeURIComponent(numeroContrato)}">Rentabilidade</a>
@@ -92,6 +92,20 @@ function montarLinhaContrato(c) {
       </td>
     </tr>
   `;
+}
+
+function textoSeguro(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (caractere) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[caractere]);
+}
+
+function classeStatus(status) {
+  return String(status || '').replace(/[^a-z0-9_-]/g, '');
 }
 
 function moeda(valor) {

@@ -26,7 +26,7 @@ async function buscarRentabilidade() {
     const resultado = await response.json();
 
     if (!resultado.success) {
-      resultadoDiv.innerHTML = `<div class="card">${resultado.message}</div>`;
+      resultadoDiv.innerHTML = `<div class="card">${textoSeguro(resultado.message || 'Erro ao consultar rentabilidade.')}</div>`;
       return;
     }
 
@@ -45,13 +45,14 @@ function montarTela(data) {
   const manutencoes = data.manutencoes || [];
   const simulacao = data.simulacao_12_meses;
 
-  const statusClass = resumo.status_rentabilidade || 'empate';
+  const statusTexto = resumo.status_rentabilidade || 'empate';
+  const statusClass = classeCss(statusTexto);
 
   document.getElementById('resultado').innerHTML = `
     <div class="card">
-      <h2>${contrato.cliente || 'Cliente não informado'}</h2>
-      <p><strong>Contrato:</strong> ${contrato.numero}</p>
-      <p><strong>Status do contrato:</strong> ${contrato.status_contrato}</p>
+      <h2>${textoSeguro(contrato.cliente || 'Cliente não informado')}</h2>
+      <p><strong>Contrato:</strong> ${textoSeguro(contrato.numero || '')}</p>
+      <p><strong>Status do contrato:</strong> ${textoSeguro(contrato.status_contrato || '')}</p>
       <p><strong>Valor sem desconto:</strong> ${moeda(contrato.valor_bruto)}</p>
       <p><strong>Desconto:</strong> ${moeda(contrato.desconto)}</p>
       <p><strong>Valor final mensal:</strong> ${moeda(contrato.valor_mensal)}</p>
@@ -102,7 +103,7 @@ function montarTela(data) {
 
         <div class="metric">
           <span>Status</span>
-          <strong class="${statusClass}">${statusClass.toUpperCase()}</strong>
+          <strong class="${statusClass}">${textoSeguro(statusTexto.toUpperCase())}</strong>
         </div>
       </div>
     </div>
@@ -198,7 +199,7 @@ function montarCardSimulacao12Meses(simulacao) {
           ${simulacao.cenarios.map(c => `
             <tr>
               <td>${moeda(c.mensalidade)}</td>
-              <td>${c.forma}</td>
+              <td>${textoSeguro(c.forma || '')}</td>
               <td>${moeda(c.lucro_mensal_recorrente)}</td>
               <td>${numero(c.payback_meses)} meses</td>
               <td><strong>${moeda(c.lucro_12_meses)}</strong></td>
@@ -230,12 +231,12 @@ function montarTabelaEquipamentos(equipamentos) {
       <tbody>
         ${equipamentos.map(e => `
           <tr>
-            <td>${e.tipo || ''}</td>
-            <td>${e.marca || ''} ${e.modelo || ''}</td>
-            <td>${e.serial || ''}</td>
+            <td>${textoSeguro(e.tipo || '')}</td>
+            <td>${textoSeguro(`${e.marca || ''} ${e.modelo || ''}`.trim())}</td>
+            <td>${textoSeguro(e.serial || '')}</td>
             <td>${moeda(e.valor_usado_no_calculo)}</td>
             <td>${moeda(e.custo_instalacao)}</td>
-            <td>${e.status_vinculo || ''}</td>
+            <td>${textoSeguro(e.status_vinculo || '')}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -265,12 +266,12 @@ function montarTabelaManutencoes(manutencoes) {
           const custo = parseFloat(m.custo_tecnico || 0) + parseFloat(m.custo_material || 0);
           return `
             <tr>
-              <td>${m.data_manutencao || ''}</td>
-              <td>${m.tipo_manutencao || ''}</td>
-              <td>${m.tecnico || ''}</td>
+              <td>${textoSeguro(m.data_manutencao || '')}</td>
+              <td>${textoSeguro(m.tipo_manutencao || '')}</td>
+              <td>${textoSeguro(m.tecnico || '')}</td>
               <td>${moeda(custo)}</td>
               <td>${moeda(m.valor_cobrado_cliente)}</td>
-              <td>${m.status || ''}</td>
+              <td>${textoSeguro(m.status || '')}</td>
             </tr>
           `;
         }).join('')}
@@ -291,4 +292,18 @@ function numero(valor) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+function textoSeguro(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (caractere) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[caractere]);
+}
+
+function classeCss(valor) {
+  return String(valor || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
 }

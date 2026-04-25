@@ -1,14 +1,25 @@
 <?php
 
-const DB_HOST = 'localhost';
+define('DB_HOST', envConfig('DB_HOST', 'localhost'));
 
-const DB_SISTEMA = 'u308598921_via_ccm';
-const DB_USER_SISTEMA = 'u308598921_via_ccm';
-const DB_PASS_SISTEMA = 'Mesmox400#';
+define('DB_SISTEMA', envConfig('DB_SISTEMA', 'u308598921_via_ccm'));
+define('DB_USER_SISTEMA', envConfig('DB_USER_SISTEMA', 'u308598921_via_ccm'));
+define('DB_PASS_SISTEMA', envConfig('DB_PASS_SISTEMA', 'Mesmox400#'));
 
-const DB_VIAPROFIT = 'u308598921_via_profit';
-const DB_USER_VIAPROFIT = 'u308598921_via_profit';
-const DB_PASS_VIAPROFIT = 'Mesmox400#';
+define('DB_VIAPROFIT', envConfig('DB_VIAPROFIT', 'u308598921_via_profit'));
+define('DB_USER_VIAPROFIT', envConfig('DB_USER_VIAPROFIT', 'u308598921_via_profit'));
+define('DB_PASS_VIAPROFIT', envConfig('DB_PASS_VIAPROFIT', 'Mesmox400#'));
+
+function envConfig($chave, $padrao)
+{
+    $valor = getenv($chave);
+
+    if ($valor === false || $valor === '') {
+        return $padrao;
+    }
+
+    return $valor;
+}
 
 function conectarSistema()
 {

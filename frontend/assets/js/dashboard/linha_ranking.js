@@ -38,15 +38,16 @@ function montarTabelaRanking(lista) {
   return lista.map(c => {
     const lucro = parseFloat(c.lucro_mensal_projetado || 0);
     const classe = lucro >= 0 ? 'verde' : 'vermelho';
+    const numero = c.numero || '';
 
     return `
       <tr>
-        <td>${c.numero || ''}</td>
-        <td>${c.cliente || ''}</td>
+        <td>${textoSeguro(numero)}</td>
+        <td>${textoSeguro(c.cliente || '')}</td>
         <td>${moeda(c.valor_final)}</td>
         <td class="${classe}"><strong>${moeda(lucro)}</strong></td>
         <td>
-          <a class="btn" href="rentabilidade.html?contrato=${encodeURIComponent(c.numero || '')}">
+          <a class="btn" href="rentabilidade.html?contrato=${encodeURIComponent(numero)}">
             Ver
           </a>
         </td>
@@ -61,23 +62,24 @@ function montarTabelaSimples(lista, tipoAcao) {
   }
 
   return lista.map(c => {
-    let link = `rentabilidade.html?contrato=${encodeURIComponent(c.numero || '')}`;
+    const numero = c.numero || '';
+    let link = `rentabilidade.html?contrato=${encodeURIComponent(numero)}`;
     let texto = 'Ver';
 
     if (tipoAcao === 'equipamento') {
-      link = `vincular_equipamento.html?contrato=${encodeURIComponent(c.numero || '')}`;
+      link = `vincular_equipamento.html?contrato=${encodeURIComponent(numero)}`;
       texto = 'Vincular';
     }
 
     if (tipoAcao === 'custos') {
-      link = `custos.html?contrato=${encodeURIComponent(c.numero || '')}`;
+      link = `custos.html?contrato=${encodeURIComponent(numero)}`;
       texto = 'Custos';
     }
 
     return `
       <tr>
-        <td>${c.numero || ''}</td>
-        <td>${c.cliente || ''}</td>
+        <td>${textoSeguro(numero)}</td>
+        <td>${textoSeguro(c.cliente || '')}</td>
         <td>${moeda(c.valor_final)}</td>
         <td>
           <a class="btn" href="${link}">
@@ -95,7 +97,7 @@ function mostrarErroRanking(msg) {
   ids.forEach(id => {
     const el = document.getElementById(id);
     if (el) {
-      el.innerHTML = `<tr><td colspan="5">${msg}</td></tr>`;
+      el.innerHTML = `<tr><td colspan="5">${textoSeguro(msg)}</td></tr>`;
     }
   });
 }
