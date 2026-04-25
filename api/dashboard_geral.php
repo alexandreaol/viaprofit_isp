@@ -239,6 +239,8 @@ function gerarResumoGeral($connSistema, $connViaprofit)
     // ==========================
     $contratosLucrativos = 0;
     $contratosPrejuizo = 0;
+    $contratosPrejuizoMais4Meses = 0;
+    $contratosPrejuizoMais6Meses = 0;
     $contratosPayback = 0;
 
     $rankingContratos = [];
@@ -276,10 +278,20 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             : $lucroMensalProjetado;
         $paybackAcimaLimite = $saudeContrato['payback_meses'] > 6;
 
-        if ($lucroClassificacao > 0 && !$paybackAcimaLimite) {
+        $estaEmPrejuizo = $lucroClassificacao < 0 || $paybackAcimaLimite;
+
+        if (!$estaEmPrejuizo && $lucroClassificacao > 0) {
             $contratosLucrativos++;
         } else {
             $contratosPrejuizo++;
+        }
+
+        if ($estaEmPrejuizo && $saudeRealContrato['meses_pagos'] > 4) {
+            $contratosPrejuizoMais4Meses++;
+        }
+
+        if ($estaEmPrejuizo && $saudeRealContrato['meses_pagos'] > 6) {
+            $contratosPrejuizoMais6Meses++;
         }
 
         if ($saudeContrato['tem_payback']) {
@@ -303,7 +315,8 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             'tem_resultado_real' => $saudeRealContrato['tem_resultado_real'],
             'receita_real' => $saudeRealContrato['receita_real'],
             'custo_total_real' => $saudeRealContrato['custo_total_real'],
-            'lucro_total_real' => $saudeRealContrato['lucro_total_real']
+            'lucro_total_real' => $saudeRealContrato['lucro_total_real'],
+            'meses_pagos' => $saudeRealContrato['meses_pagos']
         ];
     }
 
@@ -403,6 +416,8 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             'contratos_ativos' => $totalContratosAtivos,
             'contratos_lucrativos' => $contratosLucrativos,
             'contratos_em_prejuizo' => $contratosPrejuizo,
+            'contratos_prejuizo_mais_4_meses' => $contratosPrejuizoMais4Meses,
+            'contratos_prejuizo_mais_6_meses' => $contratosPrejuizoMais6Meses,
             'contratos_em_payback' => $contratosPayback,
             'ticket_medio' => $ticketMedio
         ],
@@ -594,7 +609,8 @@ function calcularSaudeRealContratoDashboard(
             'tem_resultado_real' => false,
             'receita_real' => 0,
             'custo_total_real' => 0,
-            'lucro_total_real' => 0
+            'lucro_total_real' => 0,
+            'meses_pagos' => 0
         ];
     }
 
@@ -609,7 +625,8 @@ function calcularSaudeRealContratoDashboard(
         'tem_resultado_real' => true,
         'receita_real' => $receitaReal,
         'custo_total_real' => $custoTotalReal,
-        'lucro_total_real' => $receitaReal - $custoTotalReal
+        'lucro_total_real' => $receitaReal - $custoTotalReal,
+        'meses_pagos' => $mesesPagos
     ];
 }
 

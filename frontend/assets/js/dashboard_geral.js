@@ -57,8 +57,9 @@ function montarLinhaSaude(d) {
   document.getElementById('linhaSaudeContratos').innerHTML = `
     ${card('Contratos ativos', d.contratos_ativos)}
     ${card('Lucrativos', d.contratos_lucrativos, true)}
-    ${card('Sem lucro / payback > 6m', d.contratos_em_prejuizo, false)}
-    ${card('Com payback', d.contratos_em_payback)}
+    ${card('Com prejuízo', d.contratos_em_prejuizo, false)}
+    ${card('Prejuízo > 4 meses', d.contratos_prejuizo_mais_4_meses, false)}
+    ${card('Prejuízo > 6 meses', d.contratos_prejuizo_mais_6_meses, false)}
     ${card('Ticket médio', moeda(d.ticket_medio))}
   `;
 }
