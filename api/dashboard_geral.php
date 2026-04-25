@@ -260,8 +260,22 @@ function gerarResumoGeral($connSistema, $connViaprofit)
         );
 
         $lucroMensalProjetado = $saudeContrato['lucro_mensal_projetado'];
+        $saudeRealContrato = calcularSaudeRealContratoDashboard(
+            $connSistema,
+            $numero,
+            $contrato['id'],
+            $custosUnicosContrato,
+            $custoMensalContrato,
+            $custoRedeNeutraMensal,
+            $percentualImposto,
+            $taxaPix,
+            $taxaBoleto
+        );
+        $lucroClassificacao = $saudeRealContrato['tem_resultado_real']
+            ? $saudeRealContrato['lucro_total_real']
+            : $lucroMensalProjetado;
 
-        if ($lucroMensalProjetado > 0) {
+        if ($lucroClassificacao > 0) {
             $contratosLucrativos++;
         } else {
             $contratosPrejuizo++;
@@ -283,7 +297,11 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             'taxa_pagamento' => $saudeContrato['taxa_pagamento'],
             'custo_total_mensal_projetado' => $saudeContrato['custo_total_mensal_projetado'],
             'payback_meses' => $saudeContrato['payback_meses'],
-            'lucro_mensal_projetado' => $lucroMensalProjetado
+            'lucro_mensal_projetado' => $lucroMensalProjetado,
+            'tem_resultado_real' => $saudeRealContrato['tem_resultado_real'],
+            'receita_real' => $saudeRealContrato['receita_real'],
+            'custo_total_real' => $saudeRealContrato['custo_total_real'],
+            'lucro_total_real' => $saudeRealContrato['lucro_total_real']
         ];
     }
 
@@ -498,6 +516,128 @@ function calcularSaudeContratoDashboard(
         'payback_meses' => $paybackMeses,
         'tem_payback' => $paybackMeses > 0
     ];
+}
+
+function calcularSaudeRealContratoDashboard(
+    $connSistema,
+    $numeroContrato,
+    $idContrato,
+    $custosUnicosContrato,
+    $custoMensalContrato,
+    $custoRedeNeutraMensal,
+    $percentualImposto,
+    $taxaPix,
+    $taxaBoleto
+) {
+    $stmt = $connSistema->prepare("
+        SELECT
+            r.id,
+            r.status,
+            r.valor_final,
+            r.valor_recebido,
+            br.forma_pagamento AS forma_pagamento_baixa,
+            br.valor_pago AS valor_pago_baixa,
+            cg.gateway,
+            cg.forma_pagamento AS forma_pagamento_gateway,
+            cg.status_local,
+            cg.status_gateway
+        FROM recebimentos r
+        LEFT JOIN baixas_recebimentos br ON br.id_recebimento = r.id
+        LEFT JOIN cobrancas_gateway cg ON cg.id_recebimento = r.id
+        WHERE r.id_contrato = :id_contrato
+        AND r.status NOT IN ('cancelado','excluido')
+    ");
+    $stmt->execute([
+        ':id_contrato' => $idContrato
+    ]);
+
+    $recebimentosAgrupados = agruparRecebimentosDashboard($stmt->fetchAll());
+
+    $receitaReal = 0;
+    $totalImposto = 0;
+    $totalTaxas = 0;
+    $mesesPagos = 0;
+
+    foreach ($recebimentosAgrupados as $recebimento) {
+        $statusRecebimento = $recebimento['status'] ?? '';
+        $valorRecebido = floatval($recebimento['valor_recebido'] ?? 0);
+        $valorBaixa = floatval($recebimento['valor_pago_baixa'] ?? 0);
+        $valorPrevisto = floatval($recebimento['valor_final'] ?? 0);
+        $valorBaixado = max($valorBaixa, $valorRecebido);
+        $foiRecebido = $valorBaixado > 0
+            || $statusRecebimento === 'quitado'
+            || $statusRecebimento === 'parcial'
+            || gatewayConfirmadoDashboard($recebimento);
+
+        if (!$foiRecebido) {
+            continue;
+        }
+
+        $valorReceita = $valorBaixado > 0 ? $valorBaixado : $valorPrevisto;
+        $receitaReal += $valorReceita;
+        $totalImposto += $valorReceita * $percentualImposto;
+        $mesesPagos++;
+
+        $formaPagamento = obterFormaPagamentoDashboard($recebimento);
+
+        if ($formaPagamento === 'boleto') {
+            $totalTaxas += $taxaBoleto;
+        } elseif ($formaPagamento === 'pix') {
+            $totalTaxas += $taxaPix;
+        }
+    }
+
+    if ($mesesPagos <= 0) {
+        return [
+            'tem_resultado_real' => false,
+            'receita_real' => 0,
+            'custo_total_real' => 0,
+            'lucro_total_real' => 0
+        ];
+    }
+
+    $custoTotalReal =
+        $custosUnicosContrato +
+        ($custoMensalContrato * $mesesPagos) +
+        ($custoRedeNeutraMensal * $mesesPagos) +
+        $totalImposto +
+        $totalTaxas;
+
+    return [
+        'tem_resultado_real' => true,
+        'receita_real' => $receitaReal,
+        'custo_total_real' => $custoTotalReal,
+        'lucro_total_real' => $receitaReal - $custoTotalReal
+    ];
+}
+
+function agruparRecebimentosDashboard($linhas)
+{
+    $recebimentosAgrupados = [];
+
+    foreach ($linhas as $linha) {
+        $id = $linha['id'];
+
+        if (!isset($recebimentosAgrupados[$id])) {
+            $recebimentosAgrupados[$id] = $linha;
+            continue;
+        }
+
+        foreach ([
+            'forma_pagamento_baixa',
+            'valor_pago_baixa',
+            'gateway',
+            'forma_pagamento_gateway',
+            'status_local',
+            'status_gateway'
+        ] as $campo) {
+            if (empty($recebimentosAgrupados[$id][$campo]) && !empty($linha[$campo])) {
+                $recebimentosAgrupados[$id][$campo] = $linha[$campo];
+            }
+        }
+    }
+
+    return $recebimentosAgrupados;
 }
 
 function obterFormaPagamentoDashboard($recebimento)
