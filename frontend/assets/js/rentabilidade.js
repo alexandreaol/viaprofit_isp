@@ -43,6 +43,7 @@ function montarTela(data) {
   const resumo = data.resumo;
   const equipamentos = data.equipamentos || [];
   const manutencoes = data.manutencoes || [];
+  const simulacao = data.simulacao_12_meses;
 
   const statusClass = resumo.status_rentabilidade || 'empate';
 
@@ -57,26 +58,11 @@ function montarTela(data) {
     </div>
 
     <div class="card">
-      <h2>Resumo financeiro</h2>
+      <h2>Resumo financeiro real</h2>
       <div class="grid">
         <div class="metric">
           <span>Receita recebida</span>
           <strong>${moeda(resumo.receita_total)}</strong>
-        </div>
-
-        <div class="metric">
-          <span>Mensalidade sem desconto</span>
-          <strong>${moeda(contrato.valor_bruto)}</strong>
-        </div>
-
-        <div class="metric">
-          <span>Desconto mensal</span>
-          <strong>${moeda(contrato.desconto)}</strong>
-        </div>
-
-        <div class="metric">
-          <span>Mensalidade final</span>
-          <strong>${moeda(contrato.valor_mensal)}</strong>
         </div>
 
         <div class="metric">
@@ -100,6 +86,11 @@ function montarTela(data) {
         </div>
 
         <div class="metric">
+          <span>Lucro mensal estimado</span>
+          <strong>${moeda(resumo.lucro_mensal_estimado)}</strong>
+        </div>
+
+        <div class="metric">
           <span>Payback estimado</span>
           <strong>${numero(resumo.payback_meses)} meses</strong>
         </div>
@@ -112,6 +103,53 @@ function montarTela(data) {
     </div>
 
     <div class="card">
+      <h2>Detalhamento dos custos</h2>
+      <div class="grid">
+        <div class="metric">
+          <span>Custos únicos</span>
+          <strong>${moeda(resumo.custos_unicos)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Rede neutra acumulada</span>
+          <strong>${moeda(resumo.rede_neutra)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Rede neutra mensal</span>
+          <strong>${moeda(resumo.rede_neutra_mensal)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Impostos 6%</span>
+          <strong>${moeda(resumo.impostos)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Taxas Pix</span>
+          <strong>${moeda(resumo.taxas_pix)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Taxas Boleto</span>
+          <strong>${moeda(resumo.taxas_boleto)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Custos mensais acumulados</span>
+          <strong>${moeda(resumo.custos_mensais)}</strong>
+        </div>
+
+        <div class="metric">
+          <span>Custos gerais rateados</span>
+          <strong>${moeda(resumo.custos_gerais_rateados)}</strong>
+        </div>
+      </div>
+    </div>
+
+    ${montarCardSimulacao12Meses(simulacao)}
+
+    <div class="card">
       <h2>Equipamentos vinculados</h2>
       ${montarTabelaEquipamentos(equipamentos)}
     </div>
@@ -119,6 +157,50 @@ function montarTela(data) {
     <div class="card">
       <h2>Manutenções</h2>
       ${montarTabelaManutencoes(manutencoes)}
+    </div>
+  `;
+}
+
+function montarCardSimulacao12Meses(simulacao) {
+  if (!simulacao || !simulacao.cenarios) {
+    return '';
+  }
+
+  return `
+    <div class="card">
+      <h2>Simulação de 12 meses</h2>
+      <p>
+        Considerando equipamento de <strong>${moeda(simulacao.equipamento)}</strong>,
+        instalação custando <strong>${moeda(simulacao.custo_instalacao)}</strong> e sendo cobrada do cliente por
+        <strong>${moeda(simulacao.valor_cobrado_instalacao)}</strong>, rede neutra de
+        <strong>${moeda(simulacao.rede_neutra)}</strong>/mês, imposto de
+        <strong>${simulacao.imposto_percentual}%</strong>,
+        Pix <strong>${moeda(simulacao.taxa_pix)}</strong> e boleto
+        <strong>${moeda(simulacao.taxa_boleto)}</strong>.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Mensalidade</th>
+            <th>Forma</th>
+            <th>Lucro mensal recorrente</th>
+            <th>Payback equipamento</th>
+            <th>Lucro líquido em 12 meses</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${simulacao.cenarios.map(c => `
+            <tr>
+              <td>${moeda(c.mensalidade)}</td>
+              <td>${c.forma}</td>
+              <td>${moeda(c.lucro_mensal_recorrente)}</td>
+              <td>${numero(c.payback_meses)} meses</td>
+              <td><strong>${moeda(c.lucro_12_meses)}</strong></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
     </div>
   `;
 }
