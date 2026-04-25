@@ -62,57 +62,107 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     // ==========================
     // RECEBIMENTOS QUITADOS
+    // Agora buscando também a forma real de pagamento:
+    // - baixas_recebimentos.forma_pagamento
+    // - cobrancas_gateway.forma_pagamento
     // ==========================
     $sqlRecebimentos = "SELECT 
-                            id,
-                            competencia,
-                            referencia,
-                            valor_original,
-                            valor_desconto,
-                            valor_final,
-                            valor_recebido,
-                            emitir_boleto,
-                            status
-                        FROM recebimentos
-                        WHERE id_contrato = :id_contrato
-                        AND status = 'quitado'
-                        ORDER BY competencia ASC, id ASC";
+                            r.id,
+                            r.competencia,
+                            r.referencia,
+                            r.valor_original,
+                            r.valor_desconto,
+                            r.valor_final,
+                            r.valor_recebido,
+                            r.emitir_boleto,
+                            r.status,
+
+                            br.forma_pagamento AS forma_pagamento_baixa,
+                            br.tipo_baixa,
+                            br.valor_pago AS valor_pago_baixa,
+                            br.data_pagamento,
+
+                            cg.gateway,
+                            cg.forma_pagamento AS forma_pagamento_gateway,
+                            cg.status_local,
+                            cg.status_gateway
+                        FROM recebimentos r
+                        LEFT JOIN baixas_recebimentos br 
+                            ON br.id_recebimento = r.id
+                        LEFT JOIN cobrancas_gateway cg 
+                            ON cg.id_recebimento = r.id
+                        WHERE r.id_contrato = :id_contrato
+                        AND r.status = 'quitado'
+                        ORDER BY r.competencia ASC, r.id ASC";
 
     $stmt = $connSistema->prepare($sqlRecebimentos);
     $stmt->execute([
         ':id_contrato' => $idContrato
     ]);
 
-    $recebimentos = $stmt->fetchAll();
+    $recebimentosBrutos = $stmt->fetchAll();
+
+    /*
+     * Pode existir mais de uma cobrança_gateway ou baixa para o mesmo recebimento.
+     * Para não duplicar receita, agrupamos por r.id.
+     */
+    $recebimentosAgrupados = [];
+
+    foreach ($recebimentosBrutos as $linha) {
+        $idRecebimento = $linha['id'];
+
+        if (!isset($recebimentosAgrupados[$idRecebimento])) {
+            $recebimentosAgrupados[$idRecebimento] = $linha;
+        } else {
+            // Se já existe, preserva a primeira linha, mas tenta completar forma de pagamento se estiver vazia.
+            if (empty($recebimentosAgrupados[$idRecebimento]['forma_pagamento_baixa']) && !empty($linha['forma_pagamento_baixa'])) {
+                $recebimentosAgrupados[$idRecebimento]['forma_pagamento_baixa'] = $linha['forma_pagamento_baixa'];
+            }
+
+            if (empty($recebimentosAgrupados[$idRecebimento]['forma_pagamento_gateway']) && !empty($linha['forma_pagamento_gateway'])) {
+                $recebimentosAgrupados[$idRecebimento]['forma_pagamento_gateway'] = $linha['forma_pagamento_gateway'];
+            }
+
+            if (empty($recebimentosAgrupados[$idRecebimento]['gateway']) && !empty($linha['gateway'])) {
+                $recebimentosAgrupados[$idRecebimento]['gateway'] = $linha['gateway'];
+            }
+        }
+    }
+
+    $recebimentos = array_values($recebimentosAgrupados);
 
     $totalReceita = 0;
     $totalImposto = 0;
     $totalTaxaPix = 0;
     $totalTaxaBoleto = 0;
+    $totalTaxaOutras = 0;
     $mesesPagos = count($recebimentos);
 
     $competenciasPagas = [];
 
-    foreach ($recebimentos as $recebimento) {
+    foreach ($recebimentos as &$recebimento) {
         $valorRecebido = floatval($recebimento['valor_recebido'] ?? 0);
         $totalReceita += $valorRecebido;
 
         // Imposto: 6% sobre cada recebimento
         $totalImposto += ($valorRecebido * 0.06);
 
-        // Como a tabela não tem forma_pagamento, usamos emitir_boleto:
-        // emitir_boleto = sim => boleto
-        // emitir_boleto = nao => pix
-        if (($recebimento['emitir_boleto'] ?? 'nao') === 'sim') {
+        $formaPagamento = obterFormaPagamento($recebimento);
+        $recebimento['forma_pagamento_calculada'] = $formaPagamento;
+
+        if ($formaPagamento === 'boleto') {
             $totalTaxaBoleto += 2.99;
-        } else {
+        } elseif ($formaPagamento === 'pix') {
             $totalTaxaPix += 0.40;
+        } else {
+            $totalTaxaOutras += 0;
         }
 
         if (!empty($recebimento['competencia'])) {
             $competenciasPagas[] = $recebimento['competencia'];
         }
     }
+    unset($recebimento);
 
     $competenciasPagas = array_values(array_unique($competenciasPagas));
 
@@ -238,7 +288,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     // ==========================
     // CÁLCULO FINAL
     // ==========================
-    $totalTaxas = $totalTaxaPix + $totalTaxaBoleto;
+    $totalTaxas = $totalTaxaPix + $totalTaxaBoleto + $totalTaxaOutras;
 
     $totalCusto =
         $totalCustosUnicos +
@@ -301,6 +351,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
             'impostos' => $totalImposto,
             'taxas_pix' => $totalTaxaPix,
             'taxas_boleto' => $totalTaxaBoleto,
+            'taxas_outros' => $totalTaxaOutras,
             'taxas_total' => $totalTaxas,
 
             'custos_gerais_rateados' => $totalCustosGeraisRateados,
@@ -317,6 +368,53 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
         'manutencoes' => $manutencoes,
         'simulacao_12_meses' => $simulacao12Meses
     ]);
+}
+
+function obterFormaPagamento($recebimento)
+{
+    $formaBaixa = strtolower(trim($recebimento['forma_pagamento_baixa'] ?? ''));
+    $formaGateway = strtolower(trim($recebimento['forma_pagamento_gateway'] ?? ''));
+
+    if (!empty($formaBaixa)) {
+        return normalizarFormaPagamento($formaBaixa);
+    }
+
+    if (!empty($formaGateway)) {
+        return normalizarFormaPagamento($formaGateway);
+    }
+
+    return 'pix';
+}
+
+function normalizarFormaPagamento($forma)
+{
+    $forma = strtolower(trim($forma));
+
+    if ($forma === 'boleto' || $forma === 'bank_slip') {
+        return 'boleto';
+    }
+
+    if ($forma === 'pix' || $forma === 'qrcode' || $forma === 'qr_code') {
+        return 'pix';
+    }
+
+    if ($forma === 'dinheiro') {
+        return 'dinheiro';
+    }
+
+    if ($forma === 'transferencia' || $forma === 'transferência' || $forma === 'ted' || $forma === 'doc') {
+        return 'transferencia';
+    }
+
+    if ($forma === 'cartao' || $forma === 'cartão' || $forma === 'credit_card') {
+        return 'cartao';
+    }
+
+    if ($forma === 'debito' || $forma === 'débito' || $forma === 'debit_card') {
+        return 'debito';
+    }
+
+    return $forma ?: 'pix';
 }
 
 function tabelaExiste($conn, $tabela)
