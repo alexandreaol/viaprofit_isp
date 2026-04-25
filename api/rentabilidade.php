@@ -106,7 +106,7 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
         if (($recebimento['emitir_boleto'] ?? 'nao') === 'sim') {
             $totalTaxaBoleto += 2.99;
         } else {
-            $totalTaxaPix += 0.50;
+            $totalTaxaPix += 0.40;
         }
 
         if (!empty($recebimento['competencia'])) {
@@ -253,11 +253,17 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     $lucroMensalMedio = $mesesPagos > 0 ? ($lucroTotal / $mesesPagos) : 0;
 
     // Lucro mensal estimado do contrato daqui para frente
-    // Considera mensalidade final, rede neutra, custos mensais cadastrados e imposto médio.
+    // Considera mensalidade final, rede neutra, custos mensais cadastrados,
+    // imposto estimado e taxa Pix padrão de R$ 0,40.
     $impostoMensalEstimado = $valorMensal * 0.06;
-    $lucroMensalEstimado = $valorMensal - $custoRedeNeutraMensal - $totalCustoMensalContrato - $impostoMensalEstimado;
+    $taxaPagamentoMensalEstimada = 0.40;
+    $lucroMensalEstimado = $valorMensal
+        - $custoRedeNeutraMensal
+        - $totalCustoMensalContrato
+        - $impostoMensalEstimado
+        - $taxaPagamentoMensalEstimada;
 
-    // Payback usando investimento/custos únicos dividido pelo lucro mensal estimado
+    // Payback usando custos únicos dividido pelo lucro mensal estimado
     $payback = $lucroMensalEstimado > 0 ? ($totalCustosUnicos / $lucroMensalEstimado) : 0;
 
     $statusRentabilidade = 'empate';
@@ -267,6 +273,8 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     } elseif ($lucroTotal < 0) {
         $statusRentabilidade = 'prejuizo';
     }
+
+    $simulacao12Meses = gerarSimulacao12Meses();
 
     jsonResponse(true, 'Rentabilidade calculada', [
         'contrato' => [
@@ -306,7 +314,8 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
         ],
         'recebimentos' => $recebimentos,
         'equipamentos' => $equipamentos,
-        'manutencoes' => $manutencoes
+        'manutencoes' => $manutencoes,
+        'simulacao_12_meses' => $simulacao12Meses
     ]);
 }
 
@@ -390,4 +399,83 @@ function converterCompetenciaParaReferencia($competencia)
     }
 
     return null;
+}
+
+function gerarSimulacao12Meses()
+{
+    $equipamento = 80.00;
+    $custoInstalacao = 80.00;
+    $valorCobradoInstalacao = 80.00;
+    $redeNeutra = 23.50;
+    $impostoPercentual = 0.06;
+    $taxaPix = 0.40;
+    $taxaBoleto = 2.99;
+
+    $cenarios = [
+        [
+            'mensalidade' => 59.90,
+            'forma' => 'Pix',
+            'taxa' => $taxaPix
+        ],
+        [
+            'mensalidade' => 59.90,
+            'forma' => 'Boleto',
+            'taxa' => $taxaBoleto
+        ],
+        [
+            'mensalidade' => 69.90,
+            'forma' => 'Pix',
+            'taxa' => $taxaPix
+        ],
+        [
+            'mensalidade' => 69.90,
+            'forma' => 'Boleto',
+            'taxa' => $taxaBoleto
+        ],
+    ];
+
+    $resultado = [];
+
+    foreach ($cenarios as $cenario) {
+        $mensalidade = floatval($cenario['mensalidade']);
+        $taxaPagamento = floatval($cenario['taxa']);
+        $imposto = $mensalidade * $impostoPercentual;
+
+        $lucroMensalRecorrente =
+            $mensalidade -
+            $redeNeutra -
+            $imposto -
+            $taxaPagamento;
+
+        // Instalação custa R$80, mas é cobrada R$80 do cliente, então o impacto líquido é zero.
+        $custoInstalacaoLiquido = $custoInstalacao - $valorCobradoInstalacao;
+
+        $investimentoInicial = $equipamento + $custoInstalacaoLiquido;
+
+        $payback = $lucroMensalRecorrente > 0
+            ? ($investimentoInicial / $lucroMensalRecorrente)
+            : 0;
+
+        $lucro12Meses = ($lucroMensalRecorrente * 12) - $investimentoInicial;
+
+        $resultado[] = [
+            'mensalidade' => round($mensalidade, 2),
+            'forma' => $cenario['forma'],
+            'lucro_mensal_recorrente' => round($lucroMensalRecorrente, 2),
+            'payback_meses' => round($payback, 2),
+            'lucro_12_meses' => round($lucro12Meses, 2)
+        ];
+    }
+
+    return [
+        'equipamento' => $equipamento,
+        'custo_instalacao' => $custoInstalacao,
+        'valor_cobrado_instalacao' => $valorCobradoInstalacao,
+        'instalacao_impacto_liquido' => $custoInstalacao - $valorCobradoInstalacao,
+        'rede_neutra' => $redeNeutra,
+        'imposto_percentual' => 6,
+        'taxa_pix' => $taxaPix,
+        'taxa_boleto' => $taxaBoleto,
+        'cenarios' => $resultado
+    ];
 }
