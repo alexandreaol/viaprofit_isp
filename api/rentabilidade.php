@@ -60,37 +60,128 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
     $desconto = floatval($contrato['desconto'] ?? 0);
     $valorMensal = max(0, $valorBruto - $desconto);
 
-    $sqlReceita = "SELECT 
-                        COALESCE(SUM(valor_recebido), 0) AS total_receita,
-                        COUNT(*) AS meses_pagamento
-                    FROM recebimentos
-                    WHERE id_contrato = :id_contrato
-                    AND status = 'quitado'";
+    // ==========================
+    // RECEBIMENTOS QUITADOS
+    // ==========================
+    $sqlRecebimentos = "SELECT 
+                            id,
+                            competencia,
+                            referencia,
+                            valor_original,
+                            valor_desconto,
+                            valor_final,
+                            valor_recebido,
+                            emitir_boleto,
+                            status
+                        FROM recebimentos
+                        WHERE id_contrato = :id_contrato
+                        AND status = 'quitado'
+                        ORDER BY competencia ASC, id ASC";
 
-    $stmt = $connSistema->prepare($sqlReceita);
+    $stmt = $connSistema->prepare($sqlRecebimentos);
     $stmt->execute([
         ':id_contrato' => $idContrato
     ]);
 
-    $receita = $stmt->fetch();
+    $recebimentos = $stmt->fetchAll();
 
-    $totalReceita = floatval($receita['total_receita'] ?? 0);
-    $meses = intval($receita['meses_pagamento'] ?? 0);
+    $totalReceita = 0;
+    $totalImposto = 0;
+    $totalTaxaPix = 0;
+    $totalTaxaBoleto = 0;
+    $mesesPagos = count($recebimentos);
 
-    $sqlCustos = "SELECT 
-                    COALESCE(SUM(valor), 0) AS total_custo
-                  FROM custos_contrato
-                  WHERE numero_contrato = :numero";
+    $competenciasPagas = [];
 
-    $stmt = $connViaprofit->prepare($sqlCustos);
+    foreach ($recebimentos as $recebimento) {
+        $valorRecebido = floatval($recebimento['valor_recebido'] ?? 0);
+        $totalReceita += $valorRecebido;
+
+        // Imposto: 6% sobre cada recebimento
+        $totalImposto += ($valorRecebido * 0.06);
+
+        // Como a tabela não tem forma_pagamento, usamos emitir_boleto:
+        // emitir_boleto = sim => boleto
+        // emitir_boleto = nao => pix
+        if (($recebimento['emitir_boleto'] ?? 'nao') === 'sim') {
+            $totalTaxaBoleto += 2.99;
+        } else {
+            $totalTaxaPix += 0.50;
+        }
+
+        if (!empty($recebimento['competencia'])) {
+            $competenciasPagas[] = $recebimento['competencia'];
+        }
+    }
+
+    $competenciasPagas = array_values(array_unique($competenciasPagas));
+
+    // ==========================
+    // CUSTOS ÚNICOS DO CONTRATO
+    // equipamento, instalação, manutenção manual, material etc
+    // ==========================
+    $sqlCustosUnicos = "SELECT 
+                            COALESCE(SUM(valor), 0) AS total_custo
+                        FROM custos_contrato
+                        WHERE numero_contrato = :numero";
+
+    $stmt = $connViaprofit->prepare($sqlCustosUnicos);
     $stmt->execute([
         ':numero' => $numero
     ]);
 
-    $custos = $stmt->fetch();
+    $custosUnicos = $stmt->fetch();
+    $totalCustosUnicos = floatval($custosUnicos['total_custo'] ?? 0);
 
-    $totalCusto = floatval($custos['total_custo'] ?? 0);
+    // ==========================
+    // CUSTOS MENSAIS CADASTRADOS NO CONTRATO
+    // Ex: sistema específico, suporte, repasse extra etc
+    // ==========================
+    $totalCustoMensalContrato = 0;
+    $totalCustoMensalContratoAcumulado = 0;
 
+    if (tabelaExiste($connViaprofit, 'custos_mensais_contrato')) {
+        $sqlCustosMensais = "SELECT 
+                                COALESCE(SUM(valor), 0) AS total_mensal
+                             FROM custos_mensais_contrato
+                             WHERE numero_contrato = :numero
+                             AND ativo = 1";
+
+        $stmt = $connViaprofit->prepare($sqlCustosMensais);
+        $stmt->execute([
+            ':numero' => $numero
+        ]);
+
+        $custosMensais = $stmt->fetch();
+        $totalCustoMensalContrato = floatval($custosMensais['total_mensal'] ?? 0);
+        $totalCustoMensalContratoAcumulado = $totalCustoMensalContrato * $mesesPagos;
+    }
+
+    // ==========================
+    // REDE NEUTRA
+    // R$ 23,50 por contrato/mês pago
+    // ==========================
+    $custoRedeNeutraMensal = 23.50;
+    $totalRedeNeutra = $custoRedeNeutraMensal * $mesesPagos;
+
+    // ==========================
+    // CUSTOS GERAIS MENSAIS RATEADOS
+    // Ex: link, sistema, técnico Mikrotik etc.
+    // Divide entre contratos ativos.
+    // ==========================
+    $totalCustosGeraisRateados = 0;
+
+    if (tabelaExiste($connViaprofit, 'custos_gerais_mensais') && !empty($competenciasPagas)) {
+        $totalCustosGeraisRateados = calcularCustosGeraisRateados(
+            $connSistema,
+            $connViaprofit,
+            $competenciasPagas
+        );
+    }
+
+    // ==========================
+    // EQUIPAMENTOS VINCULADOS
+    // ==========================
     $sqlEquipamentos = "SELECT 
                             ei.id AS vinculo_id,
                             ei.numero_contrato,
@@ -120,6 +211,9 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $equipamentos = $stmt->fetchAll();
 
+    // ==========================
+    // MANUTENÇÕES
+    // ==========================
     $sqlManutencoes = "SELECT 
                             id,
                             data_manutencao,
@@ -141,15 +235,36 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
 
     $manutencoes = $stmt->fetchAll();
 
-    $lucro = $totalReceita - $totalCusto;
-    $lucroMensal = $meses > 0 ? ($lucro / $meses) : 0;
-    $payback = $valorMensal > 0 ? ($totalCusto / $valorMensal) : 0;
+    // ==========================
+    // CÁLCULO FINAL
+    // ==========================
+    $totalTaxas = $totalTaxaPix + $totalTaxaBoleto;
+
+    $totalCusto =
+        $totalCustosUnicos +
+        $totalCustoMensalContratoAcumulado +
+        $totalRedeNeutra +
+        $totalImposto +
+        $totalTaxas +
+        $totalCustosGeraisRateados;
+
+    $lucroTotal = $totalReceita - $totalCusto;
+
+    $lucroMensalMedio = $mesesPagos > 0 ? ($lucroTotal / $mesesPagos) : 0;
+
+    // Lucro mensal estimado do contrato daqui para frente
+    // Considera mensalidade final, rede neutra, custos mensais cadastrados e imposto médio.
+    $impostoMensalEstimado = $valorMensal * 0.06;
+    $lucroMensalEstimado = $valorMensal - $custoRedeNeutraMensal - $totalCustoMensalContrato - $impostoMensalEstimado;
+
+    // Payback usando investimento/custos únicos dividido pelo lucro mensal estimado
+    $payback = $lucroMensalEstimado > 0 ? ($totalCustosUnicos / $lucroMensalEstimado) : 0;
 
     $statusRentabilidade = 'empate';
 
-    if ($lucro > 0) {
+    if ($lucroTotal > 0) {
         $statusRentabilidade = 'lucro';
-    } elseif ($lucro < 0) {
+    } elseif ($lucroTotal < 0) {
         $statusRentabilidade = 'prejuizo';
     }
 
@@ -165,14 +280,114 @@ function calcularRentabilidadeContrato($connSistema, $connViaprofit)
         ],
         'resumo' => [
             'receita_total' => $totalReceita,
+
             'custo_total' => $totalCusto,
-            'lucro_total' => $lucro,
-            'meses_pagos' => $meses,
-            'lucro_mensal_medio' => $lucroMensal,
+            'custos_unicos' => $totalCustosUnicos,
+
+            'custo_mensal_contrato' => $totalCustoMensalContrato,
+            'custos_mensais' => $totalCustoMensalContratoAcumulado,
+
+            'rede_neutra_mensal' => $custoRedeNeutraMensal,
+            'rede_neutra' => $totalRedeNeutra,
+
+            'impostos' => $totalImposto,
+            'taxas_pix' => $totalTaxaPix,
+            'taxas_boleto' => $totalTaxaBoleto,
+            'taxas_total' => $totalTaxas,
+
+            'custos_gerais_rateados' => $totalCustosGeraisRateados,
+
+            'lucro_total' => $lucroTotal,
+            'meses_pagos' => $mesesPagos,
+            'lucro_mensal_medio' => $lucroMensalMedio,
+            'lucro_mensal_estimado' => $lucroMensalEstimado,
             'payback_meses' => $payback,
             'status_rentabilidade' => $statusRentabilidade
         ],
+        'recebimentos' => $recebimentos,
         'equipamentos' => $equipamentos,
         'manutencoes' => $manutencoes
     ]);
+}
+
+function tabelaExiste($conn, $tabela)
+{
+    try {
+        $stmt = $conn->prepare("SHOW TABLES LIKE :tabela");
+        $stmt->execute([
+            ':tabela' => $tabela
+        ]);
+
+        return $stmt->rowCount() > 0;
+
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+function calcularCustosGeraisRateados($connSistema, $connViaprofit, $competenciasPagas)
+{
+    $totalRateado = 0;
+
+    foreach ($competenciasPagas as $competencia) {
+        $referencia = converterCompetenciaParaReferencia($competencia);
+
+        if (empty($referencia)) {
+            continue;
+        }
+
+        $stmt = $connViaprofit->prepare("
+            SELECT COALESCE(SUM(valor), 0) AS total_geral
+            FROM custos_gerais_mensais
+            WHERE referencia = :referencia
+            AND ativo = 1
+        ");
+
+        $stmt->execute([
+            ':referencia' => $referencia
+        ]);
+
+        $totalGeral = floatval($stmt->fetch()['total_geral'] ?? 0);
+
+        if ($totalGeral <= 0) {
+            continue;
+        }
+
+        $stmt = $connSistema->prepare("
+            SELECT COUNT(*) AS total_contratos
+            FROM contratos
+            WHERE status_contrato = 'ativo'
+        ");
+
+        $stmt->execute();
+        $totalContratosAtivos = intval($stmt->fetch()['total_contratos'] ?? 0);
+
+        if ($totalContratosAtivos <= 0) {
+            continue;
+        }
+
+        $totalRateado += ($totalGeral / $totalContratosAtivos);
+    }
+
+    return $totalRateado;
+}
+
+function converterCompetenciaParaReferencia($competencia)
+{
+    // Se já vier no formato 2026-04, mantém
+    if (preg_match('/^\d{4}-\d{2}$/', $competencia)) {
+        return $competencia;
+    }
+
+    // Se vier 04/2026, converte para 2026-04
+    if (preg_match('/^(\d{2})\/(\d{4})$/', $competencia, $m)) {
+        return $m[2] . '-' . $m[1];
+    }
+
+    // Se vier 202604, converte para 2026-04
+    if (preg_match('/^\d{6}$/', $competencia)) {
+        return substr($competencia, 0, 4) . '-' . substr($competencia, 4, 2);
+    }
+
+    return null;
 }
