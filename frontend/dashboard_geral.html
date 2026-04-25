@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>ViaProfit - Dashboard Geral</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  font-family: Arial;
+  background:#f4f6f8;
+  padding:20px;
+  margin:0;
+}
+
+.container {
+  max-width:1300px;
+  margin:auto;
+}
+
+.card {
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  margin-bottom:20px;
+  box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+.grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+  gap:12px;
+}
+
+.metric {
+  background:#f9fafb;
+  padding:12px;
+  border-radius:10px;
+}
+
+.metric span {
+  font-size:12px;
+  color:#666;
+}
+
+.metric strong {
+  display:block;
+  font-size:18px;
+  margin-top:5px;
+}
+
+.verde { color:#15803d; }
+.vermelho { color:#b91c1c; }
+
+table {
+  width:100%;
+  border-collapse:collapse;
+}
+
+th, td {
+  padding:10px;
+  border-bottom:1px solid #ddd;
+}
+
+th {
+  background:#e5e7eb;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Dashboard Geral</h1>
+
+<div class="card">
+  <h2>Financeiro do mês</h2>
+  <div class="grid" id="financeiro"></div>
+</div>
+
+<div class="card">
+  <h2>Custos</h2>
+  <div class="grid" id="custos"></div>
+</div>
+
+<div class="card">
+  <h2>Operacional</h2>
+  <div class="grid" id="operacional"></div>
+</div>
+
+<div class="card">
+  <h2>Contratos recentes</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Contrato</th>
+        <th>Cliente</th>
+        <th>Valor</th>
+      </tr>
+    </thead>
+    <tbody id="contratos"></tbody>
+  </table>
+</div>
+
+</div>
+
+<script src="assets/js/dashboard_geral.js?v=1"></script>
+
+</body>
+</html>
