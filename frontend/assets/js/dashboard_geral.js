@@ -5,7 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Define mês atual
   const hoje = new Date();
-  inputRef.value = hoje.toISOString().slice(0, 7);
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  inputRef.value = `${ano}-${mes}`;
 
   carregarDashboard();
 });

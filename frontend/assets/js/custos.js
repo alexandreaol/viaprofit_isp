@@ -11,14 +11,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Preenche dados
+  localStorage.setItem('viaprofit_numero_contrato', contrato);
   document.getElementById('contratoSelecionado').textContent = contrato;
   document.getElementById('numeroContratoUnico').value = contrato;
   document.getElementById('numeroContratoMensal').value = contrato;
   document.getElementById('linkRentabilidade').href =
     `rentabilidade.html?contrato=${encodeURIComponent(contrato)}`;
+  document.getElementById('linkEquipamento').href =
+    `vincular_equipamento.html?contrato=${encodeURIComponent(contrato)}`;
 
   // Data atual
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = dataLocal();
   const campoData = document.querySelector('input[name="data_custo"]');
   if (campoData) campoData.value = hoje;
 
@@ -105,11 +108,11 @@ function mostrarErroCustos(msg) {
   const tabelaMensais = document.getElementById('listaCustosMensais');
 
   if (tabelaUnicos) {
-    tabelaUnicos.innerHTML = `<tr><td colspan="5">${msg}</td></tr>`;
+    tabelaUnicos.innerHTML = `<tr><td colspan="5">${textoSeguro(msg)}</td></tr>`;
   }
 
   if (tabelaMensais) {
-    tabelaMensais.innerHTML = `<tr><td colspan="4">${msg}</td></tr>`;
+    tabelaMensais.innerHTML = `<tr><td colspan="4">${textoSeguro(msg)}</td></tr>`;
   }
 }
 
@@ -125,11 +128,11 @@ function montarCustosUnicos(custos) {
 
   tbody.innerHTML = custos.map(c => `
     <tr>
-      <td>${c.data_custo || ''}</td>
-      <td>${c.tipo || ''}</td>
-      <td>${c.descricao || ''}</td>
+      <td>${textoSeguro(c.data_custo || '')}</td>
+      <td>${textoSeguro(c.tipo || '')}</td>
+      <td>${textoSeguro(c.descricao || '')}</td>
       <td>${moeda(c.valor)}</td>
-      <td>${c.origem || ''}</td>
+      <td>${textoSeguro(c.origem || '')}</td>
     </tr>
   `).join('');
 }
@@ -146,8 +149,8 @@ function montarCustosMensais(custos) {
 
   tbody.innerHTML = custos.map(c => `
     <tr>
-      <td>${c.tipo || ''}</td>
-      <td>${c.descricao || ''}</td>
+      <td>${textoSeguro(c.tipo || '')}</td>
+      <td>${textoSeguro(c.descricao || '')}</td>
       <td>${moeda(c.valor)}</td>
       <td>${c.ativo == 1 ? 'Sim' : 'Não'}</td>
     </tr>
@@ -159,4 +162,23 @@ function moeda(valor) {
     style: 'currency',
     currency: 'BRL'
   });
+}
+
+function textoSeguro(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (caractere) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[caractere]);
+}
+
+function dataLocal() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoje.getDate()).padStart(2, '0');
+
+  return `${ano}-${mes}-${dia}`;
 }

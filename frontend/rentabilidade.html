@@ -20,8 +20,11 @@
     th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; font-size:14px; }
     th { background:#e5e7eb; }
     input { padding:12px; border:1px solid #ccc; border-radius:8px; width:280px; max-width:100%; }
-    button { background:#2563eb; color:white; border:0; padding:12px 18px; border-radius:8px; cursor:pointer; font-weight:bold; }
-    a { color:#2563eb; text-decoration:none; font-weight:bold; }
+    button, .btn { background:#2563eb; color:white; border:0; padding:12px 18px; border-radius:8px; cursor:pointer; font-weight:bold; text-decoration:none; display:inline-block; }
+    .btn-green { background:#15803d; }
+    .btn-orange { background:#d97706; }
+    .btn-gray { background:#374151; }
+    .acoes { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   </style>
 </head>
 <body>
@@ -33,7 +36,12 @@
   <div class="card">
     <input id="numeroContrato" placeholder="Digite o número do contrato">
     <button type="button" onclick="buscarRentabilidade()">Buscar</button>
-    <a href="contratos.html" style="margin-left:10px;">Buscar contratos</a>
+    <div class="acoes" style="margin-top:12px;">
+      <a class="btn btn-gray" href="dashboard.html">Contratos</a>
+      <a class="btn btn-orange" id="linkCustos" href="custos.html">Custos</a>
+      <a class="btn" id="linkEquipamento" href="vincular_equipamento.html">Equipamento</a>
+      <a class="btn btn-green" href="dashboard_geral.html">Dashboard geral</a>
+    </div>
   </div>
 
   <div id="resultado"></div>

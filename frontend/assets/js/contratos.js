@@ -46,7 +46,7 @@ async function buscarContratos() {
 
 function selecionarContrato(numero) {
   localStorage.setItem('viaprofit_numero_contrato', numero);
-  window.location.href = `vincular_equipamento.html?contrato=${encodeURIComponent(numero)}`;
+  window.location.href = `rentabilidade.html?contrato=${encodeURIComponent(numero)}`;
 }
 
 function formatarValor(valor) {

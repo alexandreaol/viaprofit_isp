@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (contrato) {
     document.getElementById('numeroContrato').value = contrato;
+    registrarContratoSelecionado(contrato);
     buscarRentabilidade();
   }
 });
@@ -19,6 +20,7 @@ async function buscarRentabilidade() {
     return;
   }
 
+  registrarContratoSelecionado(numero);
   resultadoDiv.innerHTML = '<div class="card">Carregando...</div>';
 
   try {
@@ -292,6 +294,22 @@ function numero(valor) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+function registrarContratoSelecionado(contrato) {
+  localStorage.setItem('viaprofit_numero_contrato', contrato);
+
+  const query = encodeURIComponent(contrato);
+  const linkCustos = document.getElementById('linkCustos');
+  const linkEquipamento = document.getElementById('linkEquipamento');
+
+  if (linkCustos) {
+    linkCustos.href = `custos.html?contrato=${query}`;
+  }
+
+  if (linkEquipamento) {
+    linkEquipamento.href = `vincular_equipamento.html?contrato=${query}`;
+  }
 }
 
 function textoSeguro(valor) {

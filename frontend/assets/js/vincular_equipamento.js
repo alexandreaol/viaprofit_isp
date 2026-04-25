@@ -6,14 +6,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!contrato) {
     alert('Nenhum contrato selecionado.');
-    window.location.href = 'contratos.html';
+    window.location.href = 'dashboard.html';
     return;
   }
 
+  localStorage.setItem('viaprofit_numero_contrato', contrato);
   document.getElementById('contratoSelecionado').textContent = contrato;
   document.getElementById('numeroContrato').value = contrato;
+  document.getElementById('linkRentabilidade').href =
+    `rentabilidade.html?contrato=${encodeURIComponent(contrato)}`;
+  document.getElementById('linkCustos').href =
+    `custos.html?contrato=${encodeURIComponent(contrato)}`;
 
-  const hoje = new Date().toISOString().split('T')[0];
+  const hoje = dataLocal();
   document.querySelector('input[name="data_instalacao"]').value = hoje;
   document.getElementById('novo_data_compra').value = hoje;
 
@@ -58,8 +63,8 @@ async function carregarEquipamentos() {
     }
 
     select.innerHTML = '<option value="">Selecione</option>' + equipamentos.map(eq => `
-      <option value="${eq.id}" data-valor="${eq.valor_compra || 0}">
-        ${eq.tipo || ''} - ${eq.marca || ''} ${eq.modelo || ''} | Serial: ${eq.serial || 'sem serial'} | R$ ${formatarValor(eq.valor_compra)}
+      <option value="${textoSeguro(eq.id)}" data-valor="${textoSeguro(eq.valor_compra || 0)}">
+        ${textoSeguro(eq.tipo || '')} - ${textoSeguro(eq.marca || '')} ${textoSeguro(eq.modelo || '')} | Serial: ${textoSeguro(eq.serial || 'sem serial')} | R$ ${formatarValor(eq.valor_compra)}
       </option>
     `).join('');
 
@@ -170,7 +175,8 @@ async function vincularEquipamento(equipamentoId) {
     }
 
     alert('Equipamento vinculado com sucesso!');
-    window.location.href = 'contratos.html';
+    const contrato = formData.get('numero_contrato');
+    window.location.href = `rentabilidade.html?contrato=${encodeURIComponent(contrato)}`;
 
   } catch (erro) {
     console.error(erro);
@@ -183,4 +189,23 @@ function formatarValor(valor) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+function textoSeguro(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (caractere) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[caractere]);
+}
+
+function dataLocal() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoje.getDate()).padStart(2, '0');
+
+  return `${ano}-${mes}-${dia}`;
 }

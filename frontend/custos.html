@@ -15,6 +15,8 @@
     button, .btn { background:#2563eb; color:white; border:0; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:bold; text-decoration:none; display:inline-block; }
     .btn-green { background:#15803d; }
     .btn-gray { background:#374151; }
+    .btn-orange { background:#d97706; }
+    .acoes { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     table { width:100%; border-collapse:collapse; }
     th, td { padding:10px; border-bottom:1px solid #ddd; text-align:left; font-size:14px; }
     th { background:#e5e7eb; }
@@ -27,8 +29,12 @@
 
   <div class="card">
     <p><strong>Contrato:</strong> <span id="contratoSelecionado"></span></p>
-    <a class="btn btn-gray" href="dashboard.html">Voltar ao dashboard</a>
-    <a class="btn btn-green" id="linkRentabilidade" href="#">Ver rentabilidade</a>
+    <div class="acoes">
+      <a class="btn btn-gray" href="dashboard.html">Contratos</a>
+      <a class="btn btn-green" id="linkRentabilidade" href="#">Rentabilidade</a>
+      <a class="btn" id="linkEquipamento" href="#">Equipamento</a>
+      <a class="btn btn-orange" href="dashboard_geral.html">Dashboard geral</a>
+    </div>
   </div>
 
   <div class="card">

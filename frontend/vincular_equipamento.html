@@ -12,7 +12,11 @@
     .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
     label { font-weight:bold; font-size:13px; }
     input, select, textarea { width:100%; padding:10px; margin-top:4px; border:1px solid #ccc; border-radius:8px; box-sizing:border-box; }
-    button { background:#2563eb; color:white; border:0; padding:12px 18px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:15px; }
+    button, .btn { background:#2563eb; color:white; border:0; padding:12px 18px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:15px; text-decoration:none; display:inline-block; }
+    .btn-green { background:#15803d; }
+    .btn-orange { background:#d97706; }
+    .btn-gray { background:#374151; }
+    .acoes { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .hidden { display:none; }
   </style>
 </head>
@@ -23,7 +27,12 @@
 
   <div class="card">
     <p><strong>Contrato selecionado:</strong> <span id="contratoSelecionado"></span></p>
-    <a href="contratos.html">Voltar para contratos</a>
+    <div class="acoes">
+      <a class="btn btn-gray" href="dashboard.html">Contratos</a>
+      <a class="btn btn-green" id="linkRentabilidade" href="#">Rentabilidade</a>
+      <a class="btn btn-orange" id="linkCustos" href="#">Custos</a>
+      <a class="btn" href="dashboard_geral.html">Dashboard geral</a>
+    </div>
   </div>
 
   <div class="card">
