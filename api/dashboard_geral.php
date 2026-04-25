@@ -250,16 +250,16 @@ function gerarResumoGeral($connSistema, $connViaprofit)
         $custosUnicosContrato = buscarCustosUnicosContrato($connViaprofit, $numero);
         $custoMensalContrato = buscarCustoMensalContrato($connViaprofit, $numero);
 
-        $impostoMensal = $valorMensal * $percentualImposto;
-        $taxaPagamentoPadrao = $taxaPix;
-        $redeNeutraMensal = $custoRedeNeutraMensal;
+        $saudeContrato = calcularSaudeContratoDashboard(
+            $valorMensal,
+            $custoMensalContrato,
+            $custosUnicosContrato,
+            $custoRedeNeutraMensal,
+            $percentualImposto,
+            $taxaPix
+        );
 
-        $lucroMensalProjetado =
-            $valorMensal -
-            $redeNeutraMensal -
-            $impostoMensal -
-            $taxaPagamentoPadrao -
-            $custoMensalContrato;
+        $lucroMensalProjetado = $saudeContrato['lucro_mensal_projetado'];
 
         if ($lucroMensalProjetado > 0) {
             $contratosLucrativos++;
@@ -267,7 +267,7 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             $contratosPrejuizo++;
         }
 
-        if ($custosUnicosContrato > 0 && $lucroMensalProjetado > 0) {
+        if ($saudeContrato['tem_payback']) {
             $contratosPayback++;
         }
 
@@ -278,6 +278,11 @@ function gerarResumoGeral($connSistema, $connViaprofit)
             'valor_final' => $valorMensal,
             'custos_unicos' => $custosUnicosContrato,
             'custo_mensal_contrato' => $custoMensalContrato,
+            'custo_rede_neutra' => $saudeContrato['custo_rede_neutra'],
+            'imposto_mensal' => $saudeContrato['imposto_mensal'],
+            'taxa_pagamento' => $saudeContrato['taxa_pagamento'],
+            'custo_total_mensal_projetado' => $saudeContrato['custo_total_mensal_projetado'],
+            'payback_meses' => $saudeContrato['payback_meses'],
             'lucro_mensal_projetado' => $lucroMensalProjetado
         ];
     }
@@ -438,6 +443,40 @@ function buscarCustoMensalContrato($connViaprofit, $numeroContrato)
     ]);
 
     return floatval($stmt->fetch()['total'] ?? 0);
+}
+
+function calcularSaudeContratoDashboard(
+    $valorMensal,
+    $custoMensalContrato,
+    $custosUnicosContrato,
+    $custoRedeNeutraMensal,
+    $percentualImposto,
+    $taxaPagamentoPadrao
+) {
+    $impostoMensal = $valorMensal * $percentualImposto;
+
+    $custoTotalMensalProjetado =
+        $custoRedeNeutraMensal +
+        $impostoMensal +
+        $taxaPagamentoPadrao +
+        $custoMensalContrato;
+
+    $lucroMensalProjetado = $valorMensal - $custoTotalMensalProjetado;
+
+    $paybackMeses = ($custosUnicosContrato > 0 && $lucroMensalProjetado > 0)
+        ? ($custosUnicosContrato / $lucroMensalProjetado)
+        : 0;
+
+    return [
+        'custo_rede_neutra' => $custoRedeNeutraMensal,
+        'imposto_mensal' => $impostoMensal,
+        'taxa_pagamento' => $taxaPagamentoPadrao,
+        'custo_mensal_contrato' => $custoMensalContrato,
+        'custo_total_mensal_projetado' => $custoTotalMensalProjetado,
+        'lucro_mensal_projetado' => $lucroMensalProjetado,
+        'payback_meses' => $paybackMeses,
+        'tem_payback' => $paybackMeses > 0
+    ];
 }
 
 function obterFormaPagamentoDashboard($recebimento)
