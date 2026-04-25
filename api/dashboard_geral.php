@@ -263,7 +263,7 @@ function gerarResumoGeral($connSistema, $connViaprofit)
 
         if ($lucroMensalProjetado > 0) {
             $contratosLucrativos++;
-        } elseif ($lucroMensalProjetado < 0) {
+        } else {
             $contratosPrejuizo++;
         }
 
@@ -410,20 +410,41 @@ function gerarResumoGeral($connSistema, $connViaprofit)
 
 function buscarCustosUnicosContrato($connViaprofit, $numeroContrato)
 {
-    if (!tabelaExisteDashboard($connViaprofit, 'custos_contrato')) {
-        return 0;
+    $total = 0;
+
+    if (tabelaExisteDashboard($connViaprofit, 'custos_contrato')) {
+        $stmt = $connViaprofit->prepare("
+            SELECT COALESCE(SUM(valor), 0) AS total
+            FROM custos_contrato
+            WHERE numero_contrato = :numero
+        ");
+        $stmt->execute([
+            ':numero' => $numeroContrato
+        ]);
+
+        $total += floatval($stmt->fetch()['total'] ?? 0);
     }
 
-    $stmt = $connViaprofit->prepare("
-        SELECT COALESCE(SUM(valor), 0) AS total
-        FROM custos_contrato
-        WHERE numero_contrato = :numero
-    ");
-    $stmt->execute([
-        ':numero' => $numeroContrato
-    ]);
+    if (tabelaExisteDashboard($connViaprofit, 'equipamentos_instalados')) {
+        $stmt = $connViaprofit->prepare("
+            SELECT COALESCE(SUM(valor_usado_no_calculo + custo_instalacao), 0) AS total
+            FROM equipamentos_instalados
+            WHERE numero_contrato = :numero
+            AND status = 'instalado'
+        ");
+        $stmt->execute([
+            ':numero' => $numeroContrato
+        ]);
 
-    return floatval($stmt->fetch()['total'] ?? 0);
+        $totalEquipamentos = floatval($stmt->fetch()['total'] ?? 0);
+
+        // Quando o vínculo já gerou custos_contrato, evita contar o investimento duas vezes.
+        if ($total <= 0) {
+            $total += $totalEquipamentos;
+        }
+    }
+
+    return $total;
 }
 
 function buscarCustoMensalContrato($connViaprofit, $numeroContrato)
